@@ -10,13 +10,20 @@ import {
     resources,
     Sprite,
     SpriteFrame,
-    sys,
     tween,
     UITransform,
     UIOpacity,
     Vec3,
     VerticalTextAlignment,
 } from 'cc';
+import {
+    applyCustomization,
+    calculateStats,
+    loadProgress,
+    PlayerStats,
+    saveProgress,
+} from './GameProgress';
+import { PlayerStatKey } from './StoryData';
 
 const { ccclass } = _decorator;
 
@@ -34,6 +41,13 @@ interface PersonalityChoice {
     name: string;
     description: string;
     symbol: string;
+    color: Color;
+}
+
+interface AttributeView {
+    title: string;
+    valueLabel: Label;
+    fill: Graphics;
     color: Color;
 }
 
@@ -94,8 +108,20 @@ export class CharacterCustomization extends Component {
     private toastNode: Node | null = null;
     private zodiacOptions = new Map<string, Node>();
     private personalityOptions = new Map<string, Node>();
+    private attributeViews = new Map<PlayerStatKey, AttributeView>();
+    private previewStats: PlayerStats = calculateStats('', '');
 
     protected start(): void {
+        const saved = loadProgress();
+        if (
+            saved.zodiac
+            && saved.zodiac !== '未选择'
+            && saved.personality
+            && saved.personality !== '未选择'
+        ) {
+            director.loadScene('Main');
+            return;
+        }
         this.createLayers();
         this.createBackground();
         this.createCharacter();
@@ -366,6 +392,7 @@ export class CharacterCustomization extends Component {
                     ring.active = key === choice.name;
                 }
             });
+            this.refreshAttributePreview();
             this.showToast(`星座已选择：${choice.name}`);
         });
     }
@@ -428,6 +455,7 @@ export class CharacterCustomization extends Component {
                     ring.active = key === choice.name;
                 }
             });
+            this.refreshAttributePreview();
             this.showToast(`性格已选择：${choice.name}`);
         });
     }
@@ -452,34 +480,35 @@ export class CharacterCustomization extends Component {
     }
 
     private createAttributes(): void {
-        this.createAttributeBar('Wisdom', '才智', 4, -150, new Color(250, 145, 178, 255));
-        this.createAttributeBar('Beauty', '美貌', 3, -192, new Color(231, 160, 220, 255));
-        this.createAttributeBar('Emotion', '情商', 4, -234, new Color(252, 163, 187, 255));
-        this.createAttributeBar('Insight', '洞察力', 4, -276, new Color(172, 168, 239, 255));
+        this.createAttributeBar('Wisdom', 'wisdom', '才智', -150, new Color(250, 145, 178, 255));
+        this.createAttributeBar('Beauty', 'beauty', '美貌', -192, new Color(231, 160, 220, 255));
+        this.createAttributeBar('Emotion', 'emotion', '情商', -234, new Color(252, 163, 187, 255));
+        this.createAttributeBar('Insight', 'insight', '洞察力', -276, new Color(172, 168, 239, 255));
+        this.refreshAttributePreview();
     }
 
     private createAttributeBar(
         name: string,
+        key: PlayerStatKey,
         title: string,
-        value: number,
         localY: number,
         color: Color,
     ): void {
         const bar = this.createUiNode(name, this.attributeLayer);
         bar.setPosition(PANEL_X, PANEL_Y + localY);
         bar.getComponent(UITransform)?.setContentSize(350, 34);
-        const graphics = bar.addComponent(Graphics);
-        graphics.fillColor = new Color(252, 231, 243, 230);
-        graphics.roundRect(-175, -17, 350, 34, 17);
-        graphics.fill();
-        graphics.fillColor = color;
-        graphics.roundRect(-175, -17, 350 * (value / 5), 34, 17);
-        graphics.fill();
+        const background = bar.addComponent(Graphics);
+        background.fillColor = new Color(252, 231, 243, 230);
+        background.roundRect(-175, -17, 350, 34, 17);
+        background.fill();
 
-        this.addLabel(
+        const fillNode = this.createUiNode('AttributeFill', bar);
+        fillNode.getComponent(UITransform)?.setContentSize(350, 34);
+        const fill = fillNode.addComponent(Graphics);
+        const valueLabel = this.addLabel(
             bar,
             'AttributeName',
-            `${title}  ${value}`,
+            `${title}  ${this.previewStats[key]}`,
             20,
             new Color(99, 68, 104, 255),
             Vec3.ZERO,
@@ -487,11 +516,25 @@ export class CharacterCustomization extends Component {
             32,
             true,
         );
+        this.attributeViews.set(key, { title, valueLabel, fill, color });
+
         this.makeInteractive(bar, () => this.showModal(
-            `${title} ${value}`,
-            `影响角色成长与剧情判定。\n\n当前${title}为 ${value}/5，选择不同星座和性格可以获得不同组合。`,
+            `${title} ${this.previewStats[key]}`,
+            `影响角色成长与剧情判定。\n\n当前${title}为 ${this.previewStats[key]}/5，选择不同星座和性格可以获得不同组合。`,
             color,
         ));
+    }
+
+    private refreshAttributePreview(): void {
+        this.previewStats = calculateStats(this.selectedZodiac, this.selectedPersonality);
+        this.attributeViews.forEach((view, key) => {
+            const value = this.previewStats[key];
+            view.valueLabel.string = `${view.title}  ${value}`;
+            view.fill.clear();
+            view.fill.fillColor = view.color;
+            view.fill.roundRect(-175, -17, 350 * (value / 5), 34, 17);
+            view.fill.fill();
+        });
     }
 
     private createActions(): void {
@@ -602,8 +645,12 @@ export class CharacterCustomization extends Component {
     }
 
     private confirmAndEnterMarket(): void {
-        sys.localStorage.setItem('loverman.zodiac', this.selectedZodiac || '未选择');
-        sys.localStorage.setItem('loverman.personality', this.selectedPersonality || '未选择');
+        const progress = applyCustomization(
+            loadProgress(),
+            this.selectedZodiac,
+            this.selectedPersonality,
+        );
+        saveProgress(progress);
         director.loadScene('Main');
     }
 

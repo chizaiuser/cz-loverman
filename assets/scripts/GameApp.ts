@@ -2,6 +2,7 @@ import {
     _decorator,
     Color,
     Component,
+    director,
     Graphics,
     HorizontalTextAlignment,
     Label,
@@ -15,6 +16,16 @@ import {
     Vec3,
     VerticalTextAlignment,
 } from 'cc';
+import {
+    applyChoice,
+    getBond,
+    loadProgress,
+    meetsRequirement,
+    PlayerProgress,
+    saveProgress,
+    statLabel,
+} from './GameProgress';
+import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
 
 const { ccclass } = _decorator;
 
@@ -30,14 +41,22 @@ export class GameApp extends Component {
     private modalLayer!: Node;
     private feedbackLayer!: Node;
     private modal: Node | null = null;
+    private choiceModal: Node | null = null;
+    private toastNode: Node | null = null;
+    private progress!: PlayerProgress;
+    private objectiveLabel: Label | null = null;
+    private clueBubble: Node | null = null;
+    private clueCard: Node | null = null;
 
     protected start(): void {
+        this.progress = loadProgress();
         this.createLayers();
         this.createBackground();
         this.createCharacters();
         this.createStoryUi();
         this.createActions();
         this.showSceneHint();
+        this.updateStoryUi();
     }
 
     private createLayers(): void {
@@ -189,15 +208,33 @@ export class GameApp extends Component {
             178,
             386,
         );
-        this.makeInteractive(silverBoy, () => this.showModal(
-            '银发少年',
-            '他站在甜品摊旁，像是在等待某个人。\n\n“今天的花，比平时更热闹。”',
-            new Color(162, 190, 255, 255),
-        ));
+        this.makeInteractive(silverBoy, () => this.startStoryDialogue());
     }
 
     private createStoryUi(): void {
-        this.createBubble(
+        const chapterBar = this.createUiNode('ChapterObjective', this.storyLayer);
+        chapterBar.setPosition(0, 505);
+        chapterBar.getComponent(UITransform)?.setContentSize(560, 48);
+        const chapterGraphics = chapterBar.addComponent(Graphics);
+        chapterGraphics.fillColor = new Color(255, 250, 253, 220);
+        chapterGraphics.strokeColor = new Color(238, 185, 222, 210);
+        chapterGraphics.lineWidth = 2;
+        chapterGraphics.roundRect(-280, -24, 560, 48, 24);
+        chapterGraphics.fill();
+        chapterGraphics.stroke();
+        this.objectiveLabel = this.addLabel(
+            chapterBar,
+            'ObjectiveLabel',
+            SWEET_SHOP_CHAPTER.objective,
+            19,
+            new Color(113, 75, 111, 240),
+            Vec3.ZERO,
+            525,
+            42,
+            true,
+        );
+
+        this.clueBubble = this.createBubble(
             this.storyLayer,
             'ClueBubble',
             '收集线索',
@@ -206,14 +243,10 @@ export class GameApp extends Component {
             350,
             172,
             new Color(255, 141, 193, 255),
-            () => this.showModal(
-                '收集线索',
-                '他喜欢樱花甜品，\n今天在市集散步。\n\n已加入线索簿。',
-                new Color(255, 142, 194, 255),
-            ),
+            () => this.collectSweetClue(),
         );
 
-        this.createBubble(
+        this.clueCard = this.createBubble(
             this.storyLayer,
             'InformationExpert',
             '信息达人',
@@ -239,8 +272,10 @@ export class GameApp extends Component {
             130,
             new Color(255, 143, 195, 255),
             () => this.showModal(
-                '线索详情',
-                '收集线索\n\n他喜欢樱花甜品，今天在市集散步。\n或许可以先去甜品摊看看。',
+                '当前线索',
+                this.progress.clues.length > 0
+                    ? SWEET_SHOP_CHAPTER.clueDescription
+                    : '尚未发现线索。先观察市集里的粉色线索气泡。',
                 new Color(255, 143, 195, 255),
             ),
         );
@@ -260,17 +295,24 @@ export class GameApp extends Component {
 
         this.createButton(
             this.actionLayer,
+            'GalleryButton',
+            '图鉴',
+            new Vec3(-286, 585),
+            138,
+            58,
+            new Color(198, 158, 242, 255),
+            () => director.loadScene('CharacterGallery'),
+        );
+
+        this.createButton(
+            this.actionLayer,
             'TalkButton',
             '对话',
             new Vec3(-190, -579),
             250,
             116,
             new Color(255, 149, 192, 255),
-            () => this.showModal(
-                '对话',
-                '你：今天市集很热闹。\n\n银发少年：是啊，樱花甜品也快卖完了。',
-                new Color(255, 158, 194, 255),
-            ),
+            () => this.startStoryDialogue(),
         );
 
         this.createButton(
@@ -281,11 +323,290 @@ export class GameApp extends Component {
             330,
             116,
             new Color(190, 153, 255, 255),
-            () => this.showModal(
-                '人物信息',
-                '姓名：???\n位置：樱花甜品摊\n喜好：樱花甜品\n\n继续收集线索，解锁更多资料。',
-                new Color(183, 148, 255, 255),
-            ),
+            () => this.showProgressSummary(),
+        );
+    }
+
+    private collectSweetClue(): void {
+        if (this.progress.clues.indexOf(SWEET_SHOP_CHAPTER.clueId) >= 0) {
+            this.showModal(
+                SWEET_SHOP_CHAPTER.clueTitle,
+                `${SWEET_SHOP_CHAPTER.clueDescription}\n\n线索已记录，可以去找银发少年聊聊。`,
+                new Color(255, 142, 194, 255),
+            );
+            return;
+        }
+
+        this.progress = {
+            ...this.progress,
+            clues: [...this.progress.clues, SWEET_SHOP_CHAPTER.clueId],
+        };
+        saveProgress(this.progress);
+        this.updateStoryUi();
+        this.showModal(
+            '获得线索',
+            `${SWEET_SHOP_CHAPTER.clueTitle}\n\n${SWEET_SHOP_CHAPTER.clueDescription}\n\n去找银发少年询问线索吧。`,
+            new Color(255, 142, 194, 255),
+        );
+    }
+
+    private startStoryDialogue(): void {
+        if (this.progress.clues.indexOf(SWEET_SHOP_CHAPTER.clueId) < 0) {
+            this.showModal(
+                SWEET_SHOP_CHAPTER.eventTitle,
+                '银发少年似乎在等待什么。\n\n先留意市集里的粉色线索气泡，然后再回来和他交谈。',
+                new Color(162, 190, 255, 255),
+            );
+            return;
+        }
+
+        if (this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0) {
+            const choiceId = this.progress.selectedChoices[SWEET_SHOP_CHAPTER.id];
+            const choice = SWEET_SHOP_CHAPTER.choices.find((item) => item.id === choiceId);
+            this.showModal(
+                '章节回看',
+                `${choice?.outcome ?? '你已经帮助银发少年完成了这次委托。'}\n\n他正在等你一起探索下一处樱花地标。`,
+                new Color(162, 190, 255, 255),
+            );
+            return;
+        }
+
+        this.showChoiceModal();
+    }
+
+    private showChoiceModal(): void {
+        if (this.choiceModal?.isValid) {
+            this.choiceModal.destroy();
+        }
+
+        const modal = this.createUiNode('StoryChoiceModal', this.modalLayer);
+        const opacity = modal.addComponent(UIOpacity);
+        opacity.opacity = 0;
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(44, 24, 54, 170);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createUiNode('ChoicePanel', modal);
+        panel.setPosition(0, 5);
+        panel.getComponent(UITransform)?.setContentSize(640, 730);
+        const panelGraphics = panel.addComponent(Graphics);
+        panelGraphics.fillColor = new Color(255, 247, 252, 252);
+        panelGraphics.strokeColor = new Color(187, 158, 242, 255);
+        panelGraphics.lineWidth = 5;
+        panelGraphics.roundRect(-320, -365, 640, 730, 38);
+        panelGraphics.fill();
+        panelGraphics.stroke();
+        panelGraphics.fillColor = new Color(190, 153, 255, 255);
+        panelGraphics.roundRect(-124, 275, 248, 62, 31);
+        panelGraphics.fill();
+
+        this.addLabel(
+            panel,
+            'ChoiceTitle',
+            SWEET_SHOP_CHAPTER.eventTitle,
+            31,
+            Color.WHITE,
+            new Vec3(0, 306),
+            430,
+            58,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'ChoiceDescription',
+            SWEET_SHOP_CHAPTER.eventDescription,
+            24,
+            new Color(87, 56, 88, 255),
+            new Vec3(0, 200),
+            550,
+            120,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'CurrentStats',
+            `才智 ${this.progress.stats.wisdom} · 美貌 ${this.progress.stats.beauty} · 情商 ${this.progress.stats.emotion} · 洞察 ${this.progress.stats.insight}`,
+            17,
+            new Color(142, 99, 145, 230),
+            new Vec3(0, 125),
+            550,
+            36,
+            true,
+        );
+
+        const choiceY = [50, -60, -170];
+        SWEET_SHOP_CHAPTER.choices.forEach((choice, index) => {
+            this.createChoiceButton(panel, choice, choiceY[index]);
+        });
+
+        const closeButton = this.createUiNode('CloseChoices', panel);
+        closeButton.setPosition(0, -286);
+        closeButton.getComponent(UITransform)?.setContentSize(220, 50);
+        const closeGraphics = closeButton.addComponent(Graphics);
+        closeGraphics.fillColor = new Color(246, 231, 243, 235);
+        closeGraphics.roundRect(-110, -25, 220, 50, 25);
+        closeGraphics.fill();
+        this.addLabel(
+            closeButton,
+            'CloseLabel',
+            '暂不决定',
+            21,
+            new Color(122, 88, 126, 255),
+            Vec3.ZERO,
+            190,
+            44,
+            true,
+        );
+        this.makeInteractive(closeButton, () => {
+            if (this.choiceModal === modal) {
+                this.choiceModal = null;
+            }
+            modal.destroy();
+        });
+
+        this.choiceModal = modal;
+        tween(opacity).to(0.16, { opacity: 255 }).start();
+        tween(panel)
+            .set({ scale: new Vec3(0.94, 0.94, 1) })
+            .to(0.2, { scale: Vec3.ONE }, { easing: 'backOut' })
+            .start();
+    }
+
+    private createChoiceButton(parent: Node, choice: StoryChoice, y: number): void {
+        const available = meetsRequirement(this.progress.stats, choice.requirement);
+        const button = this.createUiNode(`Choice_${choice.id}`, parent);
+        button.setPosition(0, y);
+        button.getComponent(UITransform)?.setContentSize(550, 94);
+        const graphics = button.addComponent(Graphics);
+        graphics.fillColor = available
+            ? new Color(255, 240, 248, 248)
+            : new Color(238, 232, 237, 235);
+        graphics.strokeColor = available
+            ? new Color(255, 151, 193, 230)
+            : new Color(190, 182, 190, 200);
+        graphics.lineWidth = 3;
+        graphics.roundRect(-275, -47, 550, 94, 22);
+        graphics.fill();
+        graphics.stroke();
+
+        this.addLabel(
+            button,
+            'ChoiceLabel',
+            choice.label,
+            23,
+            available ? new Color(101, 66, 110, 255) : new Color(132, 124, 132, 230),
+            new Vec3(0, 18),
+            500,
+            34,
+            true,
+        );
+        const requirementText = choice.requirement
+            ? `${choice.description}  ${statLabel(choice.requirement.stat)}需 ${choice.requirement.minimum}`
+            : choice.description;
+        this.addLabel(
+            button,
+            'ChoiceDescription',
+            requirementText,
+            17,
+            available ? new Color(139, 91, 135, 235) : new Color(151, 143, 150, 220),
+            new Vec3(0, -20),
+            500,
+            30,
+            true,
+        );
+
+        this.makeInteractive(button, () => {
+            if (!available) {
+                this.showToast(
+                    `需要${statLabel(choice.requirement!.stat)}达到 ${choice.requirement!.minimum}`,
+                );
+                return;
+            }
+            this.applyStoryChoice(choice);
+        });
+    }
+
+    private applyStoryChoice(choice: StoryChoice): void {
+        if (this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0) {
+            return;
+        }
+        this.progress = applyChoice(this.progress, {
+            eventId: SWEET_SHOP_CHAPTER.id,
+            characterId: SWEET_SHOP_CHAPTER.characterId,
+            choiceId: choice.id,
+            effects: choice.effects,
+        });
+        saveProgress(this.progress);
+        this.updateStoryUi();
+
+        if (this.choiceModal?.isValid) {
+            this.choiceModal.destroy();
+            this.choiceModal = null;
+        }
+        this.showModal(
+            '第一章完成',
+            `${choice.outcome}\n\n奖励：礼物 +1，心动值 +${choice.effects.bondDelta ?? 0}\n沈星澜已解锁至心动图鉴。`,
+            new Color(255, 148, 190, 255),
+        );
+    }
+
+    private updateStoryUi(): void {
+        const complete = this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0;
+        const hasClue = this.progress.clues.indexOf(SWEET_SHOP_CHAPTER.clueId) >= 0;
+        if (this.objectiveLabel?.isValid) {
+            this.objectiveLabel.string = complete
+                ? '第一章完成 · 沈星澜已解锁'
+                : hasClue
+                    ? '与银发少年交谈，选择你的回应'
+                    : SWEET_SHOP_CHAPTER.objective;
+        }
+
+        const bubbleTitle = this.clueBubble
+            ?.getChildByName('BubbleTitle')
+            ?.getComponent(Label);
+        const bubbleMessage = this.clueBubble
+            ?.getChildByName('BubbleMessage')
+            ?.getComponent(Label);
+        if (bubbleTitle?.isValid) {
+            bubbleTitle.string = hasClue ? '线索已收集' : '收集线索';
+        }
+        if (bubbleMessage?.isValid) {
+            bubbleMessage.string = hasClue
+                ? '樱花甜品\n已记录到线索簿'
+                : '粉色包装纸\n似乎藏着秘密';
+        }
+
+        const cardTitle = this.clueCard
+            ?.getChildByName('BubbleTitle')
+            ?.getComponent(Label);
+        const cardMessage = this.clueCard
+            ?.getChildByName('BubbleMessage')
+            ?.getComponent(Label);
+        if (cardTitle?.isValid) {
+            cardTitle.string = complete ? '章节完成' : '当前目标';
+        }
+        if (cardMessage?.isValid) {
+            cardMessage.string = complete
+                ? '前往图鉴\n查看解锁角色'
+                : hasClue
+                    ? '去甜品摊\n和银发少年聊聊'
+                    : '先发现\n市集里的线索';
+        }
+    }
+
+    private showProgressSummary(): void {
+        const complete = this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0;
+        this.showModal(
+            '旅程进度',
+            `身份：${this.progress.zodiac || '未选择'} · ${this.progress.personality || '未选择'}\n`
+                + `属性：才智 ${this.progress.stats.wisdom} / 美貌 ${this.progress.stats.beauty} / `
+                + `情商 ${this.progress.stats.emotion} / 洞察 ${this.progress.stats.insight}\n\n`
+                + `线索：${this.progress.clues.length} 条\n`
+                + `礼物：${this.progress.gifts} 份\n`
+                + `沈星澜心动值：${getBond(this.progress, SWEET_SHOP_CHAPTER.characterId)}/6\n\n`
+                + (complete ? '第一章已完成。' : SWEET_SHOP_CHAPTER.objective),
+            new Color(183, 148, 255, 255),
         );
     }
 
@@ -535,6 +856,47 @@ export class GameApp extends Component {
                 }
             })
             .start();
+    }
+
+    private showToast(text: string): void {
+        if (this.toastNode?.isValid) {
+            this.toastNode.destroy();
+        }
+        const toast = this.createUiNode('GameToast', this.feedbackLayer);
+        toast.setPosition(0, 430);
+        toast.getComponent(UITransform)?.setContentSize(450, 56);
+        const graphics = toast.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 250, 253, 240);
+        graphics.strokeColor = new Color(255, 151, 194, 220);
+        graphics.lineWidth = 2;
+        graphics.roundRect(-225, -28, 450, 56, 28);
+        graphics.fill();
+        graphics.stroke();
+        this.addLabel(
+            toast,
+            'ToastLabel',
+            text,
+            23,
+            new Color(111, 72, 106, 255),
+            Vec3.ZERO,
+            410,
+            48,
+            true,
+        );
+        const opacity = toast.addComponent(UIOpacity);
+        tween(opacity)
+            .delay(1.2)
+            .to(0.25, { opacity: 0 })
+            .call(() => {
+                if (this.toastNode === toast) {
+                    this.toastNode = null;
+                }
+                if (toast.isValid) {
+                    toast.destroy();
+                }
+            })
+            .start();
+        this.toastNode = toast;
     }
 
     private createUiNode(name: string, parent: Node): Node {

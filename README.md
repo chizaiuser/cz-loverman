@@ -46,6 +46,34 @@ Canvas
 └─ ModalLayer            详情弹窗
 ```
 
+心动图鉴场景：
+
+```text
+Canvas
+├─ BackgroundLayer       渐变、樱花和标题
+├─ CharacterGridLayer    8 个角色卡和收集进度
+├─ ActionLayer           返回、搜索、详情、送礼物
+├─ FeedbackLayer         角色选择提示
+└─ ModalLayer            详情和操作弹窗
+```
+
 分层图片位于 `assets/resources/scene/layers`。原始的两张 JPG 只保留作素材来源，运行时不再加载整张成品界面。
 
+图鉴角色素材位于 `assets/resources/scene/gallery`。市集页左上角的“图鉴”按钮会进入 `CharacterGallery` 场景。
+
 `tools/extract_foreground.swift` 使用 macOS Vision 的显著性检测从原始 JPG 中提取透明人物，便于后续重新生成角色素材。
+
+## 当前玩法闭环
+
+角色数据、线索、礼物、好感和剧情进度统一保存在 `loverman.save.v1`。首次进入需要完成形象定制，后续启动会直接继续到市集。
+
+第一章流程：
+
+```text
+观察市集 → 收集樱花甜品线索
+→ 与银发少年交谈 → 根据属性和性格选择回应
+→ 获得礼物和好感 → 解锁沈星澜图鉴
+→ 在心动图鉴查看资料或送出礼物
+```
+
+星座与性格会给初始属性增加一点加成。情商和洞察力达到条件时可以触发对应分支，属性不足时仍可通过“请摊主一起确认”完成章节，避免流程卡死。
