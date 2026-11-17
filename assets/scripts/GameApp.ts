@@ -26,6 +26,7 @@ import {
     statLabel,
 } from './GameProgress';
 import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
+import { gameFeel } from './GameFeel';
 
 const { ccclass } = _decorator;
 
@@ -49,6 +50,7 @@ export class GameApp extends Component {
     private clueCard: Node | null = null;
 
     protected start(): void {
+        gameFeel.init();
         this.progress = loadProgress();
         this.createLayers();
         this.createBackground();
@@ -57,6 +59,7 @@ export class GameApp extends Component {
         this.createActions();
         this.showSceneHint();
         this.updateStoryUi();
+        gameFeel.fadeIn(this.node);
     }
 
     private createLayers(): void {
@@ -199,6 +202,7 @@ export class GameApp extends Component {
             '粉衣女孩正站在樱花集市入口。\n\n她似乎正在寻找与“樱花甜品”有关的线索。',
             new Color(255, 147, 190, 255),
         ));
+        gameFeel.float(player, 4, 1.8);
 
         const silverBoy = this.createSpriteNode(
             this.characterLayer,
@@ -209,6 +213,7 @@ export class GameApp extends Component {
             386,
         );
         this.makeInteractive(silverBoy, () => this.startStoryDialogue());
+        gameFeel.float(silverBoy, 4, 2.1);
     }
 
     private createStoryUi(): void {
@@ -318,7 +323,7 @@ export class GameApp extends Component {
         this.createButton(
             this.actionLayer,
             'ViewInfoButton',
-            '查看信息',
+            '线索簿',
             new Vec3(175, -579),
             330,
             116,
@@ -538,6 +543,7 @@ export class GameApp extends Component {
             effects: choice.effects,
         });
         saveProgress(this.progress);
+        gameFeel.play('success');
         this.updateStoryUi();
 
         if (this.choiceModal?.isValid) {
@@ -597,12 +603,21 @@ export class GameApp extends Component {
 
     private showProgressSummary(): void {
         const complete = this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0;
+        const clueNames = this.progress.clues.map((id) => {
+            if (id === SWEET_SHOP_CHAPTER.clueId) {
+                return SWEET_SHOP_CHAPTER.clueTitle;
+            }
+            if (id === 'old-shop-name') {
+                return '旧店名';
+            }
+            return id;
+        });
         this.showModal(
-            '旅程进度',
+            '线索簿',
             `身份：${this.progress.zodiac || '未选择'} · ${this.progress.personality || '未选择'}\n`
                 + `属性：才智 ${this.progress.stats.wisdom} / 美貌 ${this.progress.stats.beauty} / `
                 + `情商 ${this.progress.stats.emotion} / 洞察 ${this.progress.stats.insight}\n\n`
-                + `线索：${this.progress.clues.length} 条\n`
+                + `已记录线索：${clueNames.length > 0 ? clueNames.join('、') : '暂无'}\n`
                 + `礼物：${this.progress.gifts} 份\n`
                 + `沈星澜心动值：${getBond(this.progress, SWEET_SHOP_CHAPTER.characterId)}/6\n\n`
                 + (complete ? '第一章已完成。' : SWEET_SHOP_CHAPTER.objective),
@@ -735,6 +750,7 @@ export class GameApp extends Component {
         resources.load(resourcePath, SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 console.error(`[GameApp] Failed to load ${resourcePath}`, error);
+                gameFeel.showMissingImage(sprite.node, '图片加载失败');
                 return;
             }
             if (sprite.isValid) {
@@ -755,6 +771,7 @@ export class GameApp extends Component {
         node.on(Node.EventType.TOUCH_CANCEL, restore);
         node.on(Node.EventType.TOUCH_END, () => {
             restore();
+            gameFeel.play('click');
             onTap();
         });
     }

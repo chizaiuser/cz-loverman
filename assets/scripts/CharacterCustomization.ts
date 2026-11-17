@@ -24,6 +24,7 @@ import {
     saveProgress,
 } from './GameProgress';
 import { PlayerStatKey } from './StoryData';
+import { gameFeel } from './GameFeel';
 
 const { ccclass } = _decorator;
 
@@ -112,6 +113,7 @@ export class CharacterCustomization extends Component {
     private previewStats: PlayerStats = calculateStats('', '');
 
     protected start(): void {
+        gameFeel.init();
         const saved = loadProgress();
         if (
             saved.zodiac
@@ -128,6 +130,7 @@ export class CharacterCustomization extends Component {
         this.createSelectionPanel();
         this.createAttributes();
         this.createActions();
+        gameFeel.fadeIn(this.node);
     }
 
     private createLayers(): void {
@@ -261,6 +264,7 @@ export class CharacterCustomization extends Component {
         const sprite = character.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         this.loadSprite(sprite, 'scene/layers/pink-girl/spriteFrame');
+        gameFeel.float(character, 4, 1.7);
         this.makeInteractive(character, () => this.showModal(
             '角色预览',
             '粉衣女孩正在等待新的形象设定。\n\n选择星座和性格，让她带着专属于你的故事进入樱花之城。',
@@ -651,6 +655,7 @@ export class CharacterCustomization extends Component {
             this.selectedPersonality,
         );
         saveProgress(progress);
+        gameFeel.play('success');
         director.loadScene('Main');
     }
 
@@ -724,6 +729,7 @@ export class CharacterCustomization extends Component {
         resources.load(resourcePath, SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 console.error(`[CharacterCustomization] Failed to load ${resourcePath}`, error);
+                gameFeel.showMissingImage(sprite.node, '角色图片缺失');
                 return;
             }
             if (sprite.isValid) {
@@ -744,6 +750,7 @@ export class CharacterCustomization extends Component {
         node.on(Node.EventType.TOUCH_CANCEL, restore);
         node.on(Node.EventType.TOUCH_END, () => {
             restore();
+            gameFeel.play('click');
             onTap();
         });
     }

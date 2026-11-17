@@ -22,6 +22,7 @@ import {
     PlayerProgress,
     saveProgress,
 } from './GameProgress';
+import { gameFeel } from './GameFeel';
 
 const { ccclass } = _decorator;
 
@@ -121,6 +122,7 @@ export class CharacterGallery extends Component {
     private modal: Node | null = null;
 
     protected start(): void {
+        gameFeel.init();
         this.progress = loadProgress();
         this.selectedId = CHARACTERS.find((entry) => (
             this.progress.unlockedCharacters.indexOf(entry.id) >= 0
@@ -129,6 +131,7 @@ export class CharacterGallery extends Component {
         this.createBackground();
         this.createGallery();
         this.createActions();
+        gameFeel.fadeIn(this.node);
     }
 
     private createLayers(): void {
@@ -555,6 +558,7 @@ export class CharacterGallery extends Component {
             },
         };
         saveProgress(this.progress);
+        gameFeel.play('gift');
         this.updateProgressUi();
         this.showModal(
             '送出礼物',
@@ -726,6 +730,7 @@ export class CharacterGallery extends Component {
         resources.load(resourcePath, SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 console.error(`[CharacterGallery] Failed to load ${resourcePath}`, error);
+                gameFeel.showMissingImage(sprite.node, '角色图片缺失');
                 return;
             }
             if (sprite.isValid) {
@@ -746,6 +751,7 @@ export class CharacterGallery extends Component {
         node.on(Node.EventType.TOUCH_CANCEL, restore);
         node.on(Node.EventType.TOUCH_END, () => {
             restore();
+            gameFeel.play('click');
             onTap();
         });
     }
