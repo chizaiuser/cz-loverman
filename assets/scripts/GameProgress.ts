@@ -139,6 +139,13 @@ export function saveProgress(progress: PlayerProgress): void {
     sys.localStorage.setItem(LEGACY_PERSONALITY_KEY, progress.personality);
 }
 
+export function resetProgress(): PlayerProgress {
+    sys.localStorage.removeItem(SAVE_KEY);
+    sys.localStorage.removeItem(LEGACY_ZODIAC_KEY);
+    sys.localStorage.removeItem(LEGACY_PERSONALITY_KEY);
+    return createDefaultProgress();
+}
+
 export function applyCustomization(
     progress: PlayerProgress,
     zodiac: string,

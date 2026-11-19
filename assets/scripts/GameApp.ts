@@ -22,11 +22,12 @@ import {
     loadProgress,
     meetsRequirement,
     PlayerProgress,
+    resetProgress,
     saveProgress,
     statLabel,
 } from './GameProgress';
 import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
-import { gameFeel } from './GameFeel';
+import { FeelSettings, gameFeel } from './GameFeel';
 
 const { ccclass } = _decorator;
 
@@ -43,6 +44,9 @@ export class GameApp extends Component {
     private feedbackLayer!: Node;
     private modal: Node | null = null;
     private choiceModal: Node | null = null;
+    private settingsModal: Node | null = null;
+    private resetArmed = false;
+    private resetLabel: Label | null = null;
     private toastNode: Node | null = null;
     private progress!: PlayerProgress;
     private objectiveLabel: Label | null = null;
@@ -307,6 +311,17 @@ export class GameApp extends Component {
             58,
             new Color(198, 158, 242, 255),
             () => director.loadScene('CharacterGallery'),
+        );
+
+        this.createButton(
+            this.actionLayer,
+            'SettingsButton',
+            '设置',
+            new Vec3(286, 585),
+            138,
+            58,
+            new Color(224, 172, 229, 255),
+            () => this.showSettings(),
         );
 
         this.createButton(
@@ -623,6 +638,188 @@ export class GameApp extends Component {
                 + (complete ? '第一章已完成。' : SWEET_SHOP_CHAPTER.objective),
             new Color(183, 148, 255, 255),
         );
+    }
+
+    private showSettings(): void {
+        if (this.settingsModal?.isValid) {
+            this.settingsModal.destroy();
+        }
+        this.resetArmed = false;
+        const settings = gameFeel.getSettings();
+        const modal = this.createUiNode('SettingsModal', this.modalLayer);
+        const opacity = modal.addComponent(UIOpacity);
+        opacity.opacity = 0;
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(47, 27, 57, 165);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createUiNode('SettingsPanel', modal);
+        panel.setPosition(0, 12);
+        panel.getComponent(UITransform)?.setContentSize(620, 650);
+        const panelGraphics = panel.addComponent(Graphics);
+        panelGraphics.fillColor = new Color(255, 247, 252, 252);
+        panelGraphics.strokeColor = new Color(220, 166, 226, 255);
+        panelGraphics.lineWidth = 5;
+        panelGraphics.roundRect(-310, -325, 620, 650, 38);
+        panelGraphics.fill();
+        panelGraphics.stroke();
+        panelGraphics.fillColor = new Color(226, 166, 228, 255);
+        panelGraphics.roundRect(-92, 240, 184, 60, 30);
+        panelGraphics.fill();
+
+        this.addLabel(panel, 'SettingsTitle', '设置', 32, Color.WHITE, new Vec3(0, 270), 240, 56, true);
+        this.addLabel(
+            panel,
+            'SettingsHint',
+            '声音与触感偏好会保存在本机',
+            18,
+            new Color(142, 101, 146, 225),
+            new Vec3(0, 205),
+            430,
+            34,
+            true,
+        );
+
+        this.createSettingRow(panel, '背景音乐', 'bgmEnabled', 135, settings.bgmEnabled);
+        this.createSettingRow(panel, '界面音效', 'sfxEnabled', 45, settings.sfxEnabled);
+        this.createSettingRow(panel, '操作震动', 'vibrationEnabled', -45, settings.vibrationEnabled);
+
+        const resetButton = this.createUiNode('ResetJourneyButton', panel);
+        resetButton.setPosition(0, -150);
+        resetButton.getComponent(UITransform)?.setContentSize(390, 64);
+        const resetGraphics = resetButton.addComponent(Graphics);
+        resetGraphics.fillColor = new Color(255, 234, 242, 240);
+        resetGraphics.strokeColor = new Color(255, 153, 184, 230);
+        resetGraphics.lineWidth = 3;
+        resetGraphics.roundRect(-195, -32, 390, 64, 32);
+        resetGraphics.fill();
+        resetGraphics.stroke();
+        this.resetLabel = this.addLabel(
+            resetButton,
+            'ResetLabel',
+            '重新开始旅程',
+            24,
+            new Color(159, 69, 111, 255),
+            Vec3.ZERO,
+            350,
+            56,
+            true,
+        );
+        this.makeInteractive(resetButton, () => {
+            if (!this.resetArmed) {
+                this.resetArmed = true;
+                if (this.resetLabel?.isValid) {
+                    this.resetLabel.string = '再次点击确认重置';
+                }
+                this.showToast('重置会清除形象、线索和图鉴进度');
+                return;
+            }
+            resetProgress();
+            gameFeel.play('success');
+            if (this.settingsModal?.isValid) {
+                this.settingsModal.destroy();
+                this.settingsModal = null;
+            }
+            director.loadScene('CharacterCustomization');
+        });
+
+        const closeButton = this.createUiNode('CloseSettings', panel);
+        closeButton.setPosition(0, -245);
+        closeButton.getComponent(UITransform)?.setContentSize(220, 50);
+        const closeGraphics = closeButton.addComponent(Graphics);
+        closeGraphics.fillColor = new Color(246, 231, 243, 235);
+        closeGraphics.roundRect(-110, -25, 220, 50, 25);
+        closeGraphics.fill();
+        this.addLabel(
+            closeButton,
+            'CloseLabel',
+            '关闭',
+            21,
+            new Color(122, 88, 126, 255),
+            Vec3.ZERO,
+            190,
+            44,
+            true,
+        );
+        this.makeInteractive(closeButton, () => {
+            if (this.settingsModal === modal) {
+                this.settingsModal = null;
+            }
+            modal.destroy();
+        });
+
+        this.settingsModal = modal;
+        tween(opacity).to(0.16, { opacity: 255 }).start();
+        tween(panel)
+            .set({ scale: new Vec3(0.94, 0.94, 1) })
+            .to(0.2, { scale: Vec3.ONE }, { easing: 'backOut' })
+            .start();
+    }
+
+    private createSettingRow(
+        parent: Node,
+        title: string,
+        key: keyof FeelSettings,
+        y: number,
+        enabled: boolean,
+    ): void {
+        const row = this.createUiNode(`Setting_${key}`, parent);
+        row.setPosition(0, y);
+        row.getComponent(UITransform)?.setContentSize(540, 74);
+        const graphics = row.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 251, 254, 235);
+        graphics.strokeColor = new Color(248, 224, 241, 230);
+        graphics.lineWidth = 2;
+        graphics.roundRect(-270, -37, 540, 74, 22);
+        graphics.fill();
+        graphics.stroke();
+
+        this.addLabel(
+            row,
+            'SettingLabel',
+            title,
+            24,
+            new Color(102, 68, 109, 255),
+            new Vec3(-120, 0),
+            250,
+            52,
+            true,
+        );
+        const switchNode = this.createUiNode('Switch', row);
+        switchNode.setPosition(160, 0);
+        switchNode.getComponent(UITransform)?.setContentSize(104, 50);
+        switchNode.addComponent(Graphics);
+        this.drawSwitch(switchNode, enabled);
+
+        this.makeInteractive(row, () => {
+            const current = gameFeel.getSettings()[key];
+            const next = !current;
+            if (key === 'bgmEnabled') {
+                gameFeel.setBgmEnabled(next);
+            } else if (key === 'sfxEnabled') {
+                gameFeel.setSfxEnabled(next);
+            } else {
+                gameFeel.setVibrationEnabled(next);
+            }
+            this.drawSwitch(switchNode, next);
+        });
+    }
+
+    private drawSwitch(node: Node, enabled: boolean): void {
+        const graphics = node.getComponent(Graphics);
+        if (!graphics) {
+            return;
+        }
+        graphics.clear();
+        graphics.fillColor = enabled
+            ? new Color(218, 146, 223, 255)
+            : new Color(205, 196, 208, 255);
+        graphics.roundRect(-52, -25, 104, 50, 25);
+        graphics.fill();
+        graphics.fillColor = Color.WHITE;
+        graphics.circle(enabled ? 26 : -26, 0, 20);
+        graphics.fill();
     }
 
     private createBubble(
