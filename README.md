@@ -2,6 +2,9 @@
 
 使用 Cocos Creator 3.8.8 创建的微信小游戏项目。
 
+新增男性角色的职业、外形、性格与首章钩子见
+[docs/character-roster-10.md](docs/character-roster-10.md)。
+
 ## 打开项目
 
 1. 在 Cocos Dashboard 中选择“导入项目”。
