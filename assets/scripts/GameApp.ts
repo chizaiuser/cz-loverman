@@ -326,6 +326,17 @@ export class GameApp extends Component {
 
         this.createButton(
             this.actionLayer,
+            'CityExploreButton',
+            '进入街区',
+            new Vec3(0, -420),
+            230,
+            58,
+            new Color(238, 154, 205, 255),
+            () => director.loadScene('CityExplore'),
+        );
+
+        this.createButton(
+            this.actionLayer,
             'TalkButton',
             '对话',
             new Vec3(-190, -579),

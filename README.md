@@ -60,6 +60,19 @@ Canvas
 └─ ModalLayer            详情和操作弹窗
 ```
 
+樱花街区场景：
+
+```text
+Canvas
+├─ CityDecorationLayer   道路、人行道、喷泉、树木
+├─ BuildingLayer         商店、住宅、钟楼及碰撞区域
+├─ CharacterLayer        可移动主角
+├─ HudLayer              标题、位置、返回按钮和虚拟摇杆
+└─ FeedbackLayer         场景过渡
+```
+
+街区使用俯视 2D 布局。手机端拖动左下角摇杆移动，桌面端支持 WASD 和方向键；镜头跟随主角，建筑与喷泉会阻挡移动。从市集点击“进入街区”即可打开。
+
 分层图片位于 `assets/resources/scene/layers`。原始的两张 JPG 只保留作素材来源，运行时不再加载整张成品界面。
 
 图鉴角色素材位于 `assets/resources/scene/gallery`。市集页左上角的“图鉴”按钮会进入 `CharacterGallery` 场景。

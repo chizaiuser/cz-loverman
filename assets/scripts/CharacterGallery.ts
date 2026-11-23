@@ -3,6 +3,7 @@ import {
     Color,
     Component,
     director,
+    EventTouch,
     Graphics,
     HorizontalTextAlignment,
     Label,
@@ -103,6 +104,78 @@ const CHARACTERS: CharacterEntry[] = [
         accent: new Color(255, 171, 196, 255),
         description: '耳机里循环着为你挑的歌。如果你问起歌名，她会把另一半耳机递给你。',
     },
+    {
+        id: 'liang-xingye',
+        name: '梁星野',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/01-liang-xingye/spriteFrame',
+        accent: new Color(191, 157, 117, 255),
+        description: '独立建筑师，寡言而专注。他设计了一座没有业主的观景亭，草图却像你童年的秘密基地。',
+    },
+    {
+        id: 'tang-qi',
+        name: '唐栖',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/02-tang-qi/spriteFrame',
+        accent: new Color(94, 194, 226, 255),
+        description: '电竞战队队长，话多又好胜。匿名比赛录像里的坐标，指向一间废弃游戏厅。',
+    },
+    {
+        id: 'xie-wujiu',
+        name: '谢无咎',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/03-xie-wujiu/spriteFrame',
+        accent: new Color(145, 132, 221, 255),
+        description: '天文馆馆主，平静而神秘。他准确说出你会在今天出现，却拒绝预言接下来的故事。',
+    },
+    {
+        id: 'pei-yuchuan',
+        name: '裴予川',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/04-pei-yuchuan/spriteFrame',
+        accent: new Color(143, 193, 156, 255),
+        description: '花艺策展人，温柔而有边界。他为匿名客人准备花束，请你在花瓣里寻找收花人的线索。',
+    },
+    {
+        id: 'qi-guanlan',
+        name: '祁观澜',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/05-qi-guanlan/spriteFrame',
+        accent: new Color(142, 151, 167, 255),
+        description: '古籍修复师，克制又严谨。一册旧书缺失的页码里，出现了你的名字。',
+    },
+    {
+        id: 'cheng-yanli',
+        name: '程砚礼',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/06-cheng-yanli/spriteFrame',
+        accent: new Color(226, 166, 117, 255),
+        description: '甜品店继承人，认真直球。他想复刻你童年吃过的甜点，却不肯说出配方是谁提供的。',
+    },
+    {
+        id: 'huo-wenzhou',
+        name: '霍闻舟',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/07-huo-wenzhou/spriteFrame',
+        accent: new Color(92, 125, 174, 255),
+        description: '城市救援队长，成熟可靠。一次市集事故后，他请你在寻找走失孩子的过程中留意异常线索。',
+    },
+    {
+        id: 'song-zhao',
+        name: '宋照',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/08-song-zhao/spriteFrame',
+        accent: new Color(205, 101, 124, 255),
+        description: '剧院首席演员，明艳又敏感。他请你临时对戏，剧本里的台词却逐渐对应两人的真实经历。',
+    },
+    {
+        id: 'wen-xuechuan',
+        name: '闻雪川',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/09-wen-xuechuan/spriteFrame',
+        accent: new Color(126, 187, 230, 255),
+        description: '气象摄影师，银发冒险家。他拍到一张照片，里面是你从未去过的地点和未来的自己。',
+    },
 ];
 
 @ccclass('CharacterGallery')
@@ -120,6 +193,15 @@ export class CharacterGallery extends Component {
     private giftButton: Node | null = null;
     private toastNode: Node | null = null;
     private modal: Node | null = null;
+    private pageRoot!: Node;
+    private pages: Node[] = [];
+    private currentPage = 0;
+    private pageIndicatorLabel: Label | null = null;
+    private leftPageButton: Node | null = null;
+    private rightPageButton: Node | null = null;
+    private swipeStartX = 0;
+    private gestureMoved = false;
+    private pageAnimating = false;
 
     protected start(): void {
         gameFeel.init();
@@ -256,23 +338,57 @@ export class CharacterGallery extends Component {
         panelGraphics.fill();
         panelGraphics.stroke();
 
+        this.pageRoot = this.createUiNode('GalleryPages', this.characterLayer);
         const columns = [-232, 0, 232];
         const rows = [305, 55, -195];
-        CHARACTERS.forEach((entry, index) => {
-            const column = index % 3;
-            const row = Math.floor(index / 3);
-            this.createCharacterCard(
-                entry,
-                columns[column],
-                rows[row],
-            );
+        const pageEntries = [CHARACTERS.slice(0, 8), CHARACTERS.slice(8)];
+        pageEntries.forEach((entries, pageIndex) => {
+            const page = this.createUiNode(`GalleryPage_${pageIndex + 1}`, this.pageRoot);
+            page.setPosition(pageIndex * DESIGN_WIDTH, 0);
+            this.pages.push(page);
+            entries.forEach((entry, index) => {
+                this.createCharacterCard(
+                    page,
+                    entry,
+                    columns[index % 3],
+                    rows[Math.floor(index / 3)],
+                );
+            });
+            if (pageIndex === 0) {
+                this.createProgressCard(page, columns[2], rows[2]);
+            }
         });
-        this.createProgressCard(columns[2], rows[2]);
+
+        this.characterLayer.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            this.swipeStartX = event.getUILocation().x;
+            this.gestureMoved = false;
+        });
+        this.characterLayer.on(Node.EventType.TOUCH_MOVE, (event: EventTouch) => {
+            if (Math.abs(event.getUILocation().x - this.swipeStartX) > 12) {
+                this.gestureMoved = true;
+            }
+        });
+        this.characterLayer.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            const deltaX = event.getUILocation().x - this.swipeStartX;
+            if (Math.abs(deltaX) > 58) {
+                this.changePage(this.currentPage + (deltaX < 0 ? 1 : -1));
+            }
+            this.gestureMoved = false;
+        });
+        this.characterLayer.on(Node.EventType.TOUCH_CANCEL, () => {
+            this.gestureMoved = false;
+        });
         this.updateCardSelection();
+        this.updatePageNavigation();
     }
 
-    private createCharacterCard(entry: CharacterEntry, x: number, y: number): void {
-        const card = this.createUiNode(`CharacterCard_${entry.id}`, this.characterLayer);
+    private createCharacterCard(
+        parent: Node,
+        entry: CharacterEntry,
+        x: number,
+        y: number,
+    ): void {
+        const card = this.createUiNode(`CharacterCard_${entry.id}`, parent);
         card.setPosition(x, y);
         card.getComponent(UITransform)?.setContentSize(204, 226);
 
@@ -380,6 +496,9 @@ export class CharacterGallery extends Component {
 
         this.cardNodes.set(entry.id, card);
         this.makeInteractive(card, () => {
+            if (this.gestureMoved) {
+                return;
+            }
             if (this.progress.unlockedCharacters.indexOf(entry.id) < 0) {
                 this.showModal(
                     '尚未解锁',
@@ -394,8 +513,8 @@ export class CharacterGallery extends Component {
         });
     }
 
-    private createProgressCard(x: number, y: number): void {
-        const card = this.createUiNode('CollectionProgress', this.characterLayer);
+    private createProgressCard(parent: Node, x: number, y: number): void {
+        const card = this.createUiNode('CollectionProgress', parent);
         card.setPosition(x, y);
         card.getComponent(UITransform)?.setContentSize(204, 226);
         const graphics = card.addComponent(Graphics);
@@ -456,6 +575,49 @@ export class CharacterGallery extends Component {
         });
     }
 
+    private changePage(targetPage: number, playSound = true): void {
+        if (this.pageAnimating) {
+            return;
+        }
+        const nextPage = Math.max(0, Math.min(this.pages.length - 1, targetPage));
+        if (nextPage === this.currentPage) {
+            if (targetPage !== nextPage) {
+                this.showToast(targetPage < 0 ? '已经是第一页' : '已经是最后一页');
+            }
+            return;
+        }
+        this.pageAnimating = true;
+        this.currentPage = nextPage;
+        this.updatePageNavigation();
+        if (playSound) {
+            gameFeel.play('click');
+        }
+        tween(this.pageRoot)
+            .to(
+                0.28,
+                { position: new Vec3(-nextPage * DESIGN_WIDTH, 0, 0) },
+                { easing: 'quadOut' },
+            )
+            .call(() => {
+                this.pageAnimating = false;
+            })
+            .start();
+    }
+
+    private updatePageNavigation(): void {
+        if (this.pageIndicatorLabel?.isValid) {
+            this.pageIndicatorLabel.string = `${this.currentPage + 1} / ${this.pages.length}　左右滑动翻页`;
+        }
+        const leftOpacity = this.leftPageButton?.getComponent(UIOpacity);
+        const rightOpacity = this.rightPageButton?.getComponent(UIOpacity);
+        if (leftOpacity) {
+            leftOpacity.opacity = this.currentPage === 0 ? 80 : 255;
+        }
+        if (rightOpacity) {
+            rightOpacity.opacity = this.currentPage === this.pages.length - 1 ? 80 : 255;
+        }
+    }
+
     private createActions(): void {
         this.createButton(
             'BackButton',
@@ -479,6 +641,39 @@ export class CharacterGallery extends Component {
                 new Color(200, 150, 241, 255),
             ),
         );
+
+        this.leftPageButton = this.createButton(
+            'PreviousPageButton',
+            '‹',
+            new Vec3(-305, -420),
+            58,
+            52,
+            new Color(202, 170, 235, 255),
+            () => this.changePage(this.currentPage - 1, false),
+        );
+        this.leftPageButton.addComponent(UIOpacity);
+        this.rightPageButton = this.createButton(
+            'NextPageButton',
+            '›',
+            new Vec3(305, -420),
+            58,
+            52,
+            new Color(202, 170, 235, 255),
+            () => this.changePage(this.currentPage + 1, false),
+        );
+        this.rightPageButton.addComponent(UIOpacity);
+        this.pageIndicatorLabel = this.addLabel(
+            this.actionLayer,
+            'PageIndicator',
+            `1 / ${this.pages.length}　左右滑动翻页`,
+            17,
+            new Color(122, 86, 132, 220),
+            new Vec3(0, -420),
+            430,
+            36,
+            true,
+        );
+        this.updatePageNavigation();
 
         const actionBar = this.createUiNode('GalleryActionBar', this.actionLayer);
         actionBar.setPosition(0, -568);
