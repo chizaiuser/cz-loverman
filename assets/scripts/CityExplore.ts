@@ -21,6 +21,12 @@ import {
     VerticalTextAlignment,
 } from 'cc';
 import { gameFeel } from './GameFeel';
+import {
+    loadProgress,
+    PlayerProgress,
+    saveProgress,
+} from './GameProgress';
+import { getOutfit, OUTFITS, OutfitDefinition } from './WardrobeData';
 
 const { ccclass } = _decorator;
 
@@ -39,6 +45,50 @@ interface CollisionBox {
     top: number;
 }
 
+interface CityJob {
+    id: string;
+    building: string;
+    action: string;
+    x: number;
+    y: number;
+    baseReward: number;
+    bonusReward: number;
+    accent: Color;
+}
+
+const CITY_JOBS: CityJob[] = [
+    {
+        id: 'cafe',
+        building: '花街咖啡馆',
+        action: '冲煮咖啡',
+        x: -610,
+        y: 640,
+        baseReward: 12,
+        bonusReward: 15,
+        accent: new Color(238, 150, 190, 255),
+    },
+    {
+        id: 'sweet',
+        building: '甜心商店',
+        action: '装饰蛋糕',
+        x: 590,
+        y: 130,
+        baseReward: 15,
+        bonusReward: 18,
+        accent: new Color(246, 170, 132, 255),
+    },
+    {
+        id: 'stage',
+        building: '星屑剧场',
+        action: '整理舞台',
+        x: 590,
+        y: -1005,
+        baseReward: 18,
+        bonusReward: 22,
+        accent: new Color(186, 143, 229, 255),
+    },
+];
+
 @ccclass('CityExplore')
 export class CityExplore extends Component {
     private worldRoot!: Node;
@@ -47,17 +97,48 @@ export class CityExplore extends Component {
     private characterLayer!: Node;
     private hudLayer!: Node;
     private feedbackLayer!: Node;
+    private modalLayer!: Node;
     private player!: Node;
     private playerVisual!: Node;
     private joystickBase!: Node;
     private joystickKnob!: Node;
     private locationLabel!: Label;
+    private coinLabel!: Label;
+    private jobPromptButton!: Node;
+    private jobPromptLabel!: Label;
+    private currentJob: CityJob | null = null;
+    private jobModal: Node | null = null;
+    private jobTrack: Node | null = null;
+    private jobMarker: Node | null = null;
+    private jobTarget: Node | null = null;
+    private jobStatusLabel: Label | null = null;
+    private jobStopLabel: Label | null = null;
+    private jobCoinLabel: Label | null = null;
+    private playerOutfitAccessory: Node | null = null;
+    private wardrobeButton!: Node;
+    private wardrobeModal: Node | null = null;
+    private wardrobeList: Node | null = null;
+    private wardrobeCoinLabel: Label | null = null;
+    private wardrobeMessageLabel: Label | null = null;
+    private wardrobePreviewVisual: Node | null = null;
+    private wardrobePreviewCaption: Label | null = null;
+    private jobActive = false;
+    private jobCompleted = false;
+    private jobRound = 0;
+    private jobRoundIncome = 0;
+    private jobTotalIncome = 0;
+    private jobMarkerValue = -1;
+    private jobDirection = 1;
+    private jobSpeed = 1.25;
+    private jobTargetValue = 0;
+    private progress!: PlayerProgress;
     private keyboard = new Set<KeyCode>();
     private joystickDirection = new Vec3();
     private collisions: CollisionBox[] = [];
     private lastLocation = '';
 
     protected start(): void {
+        this.progress = loadProgress();
         gameFeel.init();
         this.createLayers();
         this.createWorld();
@@ -77,6 +158,13 @@ export class CityExplore extends Component {
         if (!this.player?.isValid) {
             return;
         }
+        if (this.jobModal?.isValid || this.wardrobeModal?.isValid) {
+            if (this.jobActive) {
+                this.updateJob(deltaTime);
+            }
+            return;
+        }
+        this.updateJobProximity();
 
         const keyboardX = (this.isPressed(KeyCode.KEY_D) || this.isPressed(KeyCode.ARROW_RIGHT) ? 1 : 0)
             - (this.isPressed(KeyCode.KEY_A) || this.isPressed(KeyCode.ARROW_LEFT) ? 1 : 0);
@@ -120,6 +208,7 @@ export class CityExplore extends Component {
         this.characterLayer = this.createLayer('CharacterLayer', this.worldRoot);
         this.hudLayer = this.createLayer('HudLayer');
         this.feedbackLayer = this.createLayer('FeedbackLayer');
+        this.modalLayer = this.createLayer('ModalLayer');
     }
 
     private createWorld(): void {
@@ -170,6 +259,7 @@ export class CityExplore extends Component {
         this.createBuildings();
         this.createFountain(0, 420);
         this.createTrees();
+        this.createJobMarkers();
     }
 
     private createRoadDetails(): void {
@@ -350,6 +440,42 @@ export class CityExplore extends Component {
         }
     }
 
+    private createJobMarkers(): void {
+        for (const job of CITY_JOBS) {
+            const marker = this.createNode(`JobMarker_${job.id}`, this.decorationLayer);
+            marker.setPosition(job.x, job.y);
+            const graphics = marker.addComponent(Graphics);
+            graphics.fillColor = new Color(job.accent.r, job.accent.g, job.accent.b, 225);
+            graphics.strokeColor = new Color(255, 255, 255, 235);
+            graphics.lineWidth = 3;
+            graphics.circle(0, 0, 34);
+            graphics.fill();
+            graphics.stroke();
+            this.addLabel(
+                marker,
+                'JobIcon',
+                '★',
+                25,
+                Color.WHITE,
+                Vec3.ZERO,
+                54,
+                48,
+                true,
+            );
+            this.addLabel(
+                marker,
+                'JobName',
+                job.action,
+                17,
+                new Color(105, 72, 112, 255),
+                new Vec3(0, -54),
+                180,
+                30,
+                true,
+            );
+        }
+    }
+
     private createPlayer(): void {
         this.player = this.createNode('Player', this.characterLayer);
         this.player.setPosition(0, -760);
@@ -375,6 +501,10 @@ export class CityExplore extends Component {
                 sprite.spriteFrame = frame;
             }
         });
+        this.playerOutfitAccessory = this.createNode('OutfitAccessory', this.playerVisual);
+        this.playerOutfitAccessory.getComponent(UITransform)?.setContentSize(140, 200);
+        this.playerOutfitAccessory.addComponent(Graphics);
+        this.drawOutfitAccessory(this.playerOutfitAccessory, this.progress.equippedOutfit);
         this.playerVisual.setPosition(0, 16);
         tween(this.playerVisual)
             .repeatForever(
@@ -420,6 +550,28 @@ export class CityExplore extends Component {
             true,
         );
 
+        const coinPill = this.createNode('CoinPill', this.hudLayer);
+        coinPill.setPosition(285, 435);
+        coinPill.getComponent(UITransform)?.setContentSize(128, 44);
+        const coinGraphics = coinPill.addComponent(Graphics);
+        coinGraphics.fillColor = new Color(255, 240, 183, 235);
+        coinGraphics.strokeColor = new Color(236, 183, 112, 235);
+        coinGraphics.lineWidth = 2;
+        coinGraphics.roundRect(-64, -22, 128, 44, 22);
+        coinGraphics.fill();
+        coinGraphics.stroke();
+        this.coinLabel = this.addLabel(
+            coinPill,
+            'CoinLabel',
+            `金币 ${this.progress.coins}`,
+            19,
+            new Color(133, 87, 57, 255),
+            Vec3.ZERO,
+            112,
+            38,
+            true,
+        );
+
         this.createHudButton('CityBackButton', '返回市集', new Vec3(-285, 500), 124, 56, () => {
             director.loadScene('Main');
         });
@@ -427,6 +579,26 @@ export class CityExplore extends Component {
             director.loadScene('CharacterGallery');
         });
         this.createJoystick();
+        this.wardrobeButton = this.createHudButton(
+            'WardrobeButton',
+            '换装',
+            new Vec3(-35, -500),
+            170,
+            82,
+            () => this.openWardrobe(),
+        );
+        this.jobPromptButton = this.createHudButton(
+            'JobPromptButton',
+            '兼职',
+            new Vec3(225, -500),
+            270,
+            82,
+            () => this.openCurrentJob(),
+        );
+        this.jobPromptLabel = this.jobPromptButton
+            .getChildByName('ButtonLabel')!
+            .getComponent(Label)!;
+        this.jobPromptButton.active = false;
         this.addLabel(
             this.hudLayer,
             'ControlHint',
@@ -520,6 +692,659 @@ export class CityExplore extends Component {
         this.joystickBase.on(Node.EventType.TOUCH_MOVE, updateJoystick);
         this.joystickBase.on(Node.EventType.TOUCH_END, resetJoystick);
         this.joystickBase.on(Node.EventType.TOUCH_CANCEL, resetJoystick);
+    }
+
+    private openWardrobe(): void {
+        if (this.wardrobeModal?.isValid) {
+            return;
+        }
+        this.jobPromptButton.active = false;
+        const modal = this.createNode('WardrobeModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(47, 28, 57, 170);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('WardrobePanel', modal);
+        panel.getComponent(UITransform)?.setContentSize(700, 960);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 252, 252);
+        graphics.strokeColor = new Color(218, 162, 224, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-350, -480, 700, 960, 40);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(219, 157, 222, 255);
+        graphics.roundRect(-110, 400, 220, 62, 31);
+        graphics.fill();
+
+        this.addLabel(
+            panel,
+            'WardrobeTitle',
+            '衣 橱',
+            32,
+            Color.WHITE,
+            new Vec3(0, 431),
+            300,
+            56,
+            true,
+        );
+        this.wardrobeCoinLabel = this.addLabel(
+            panel,
+            'WardrobeCoins',
+            `金币 ${this.progress.coins}`,
+            20,
+            new Color(151, 93, 104, 255),
+            new Vec3(240, 373),
+            180,
+            38,
+            true,
+        );
+
+        const previewCard = this.createNode('WardrobePreviewCard', panel);
+        previewCard.setPosition(-215, -5);
+        previewCard.getComponent(UITransform)?.setContentSize(220, 610);
+        const previewGraphics = previewCard.addComponent(Graphics);
+        previewGraphics.fillColor = new Color(255, 230, 243, 195);
+        previewGraphics.strokeColor = new Color(255, 255, 255, 230);
+        previewGraphics.lineWidth = 3;
+        previewGraphics.roundRect(-110, -305, 220, 610, 28);
+        previewGraphics.fill();
+        previewGraphics.stroke();
+
+        this.wardrobePreviewVisual = this.createNode('WardrobePreview', previewCard);
+        this.wardrobePreviewVisual.setPosition(0, 75);
+        this.wardrobePreviewVisual.getComponent(UITransform)?.setContentSize(180, 360);
+        const previewSprite = this.wardrobePreviewVisual.addComponent(Sprite);
+        previewSprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        resources.load('scene/layers/pink-girl/spriteFrame', SpriteFrame, (error, frame) => {
+            if (error || !frame) {
+                gameFeel.showMissingImage(this.wardrobePreviewVisual, '角色素材缺失');
+                return;
+            }
+            if (previewSprite.isValid) {
+                previewSprite.spriteFrame = frame;
+            }
+        });
+        const previewAccessory = this.createNode('PreviewOutfitAccessory', this.wardrobePreviewVisual);
+        previewAccessory.getComponent(UITransform)?.setContentSize(180, 260);
+        previewAccessory.addComponent(Graphics);
+        this.drawOutfitAccessory(previewAccessory, this.progress.equippedOutfit);
+
+        this.wardrobePreviewCaption = this.addLabel(
+            previewCard,
+            'PreviewCaption',
+            '',
+            18,
+            new Color(121, 77, 126, 255),
+            new Vec3(0, -238),
+            190,
+            74,
+            true,
+        );
+        this.wardrobeMessageLabel = this.addLabel(
+            panel,
+            'WardrobeMessage',
+            '选择服装购买或穿戴',
+            18,
+            new Color(149, 101, 149, 230),
+            new Vec3(-215, -334),
+            220,
+            44,
+            true,
+        );
+
+        this.wardrobeList = this.createNode('WardrobeList', panel);
+        this.wardrobeList.getComponent(UITransform)?.setContentSize(430, 660);
+        this.renderWardrobeList();
+
+        this.createPanelButton(
+            panel,
+            'CloseWardrobe',
+            '关闭衣橱',
+            new Vec3(0, -425),
+            240,
+            52,
+            new Color(211, 180, 222, 255),
+            () => this.closeWardrobe(),
+        );
+        this.wardrobeModal = modal;
+        this.updateWardrobePreview();
+    }
+
+    private renderWardrobeList(): void {
+        if (!this.wardrobeList?.isValid) {
+            return;
+        }
+        for (const child of [...this.wardrobeList.children]) {
+            child.destroy();
+        }
+        OUTFITS.forEach((outfit, index) => {
+            this.createOutfitRow(outfit, 260 - index * 112);
+        });
+    }
+
+    private createOutfitRow(outfit: OutfitDefinition, y: number): void {
+        if (!this.wardrobeList?.isValid) {
+            return;
+        }
+        const row = this.createNode(`Outfit_${outfit.id}`, this.wardrobeList);
+        row.setPosition(120, y);
+        row.getComponent(UITransform)?.setContentSize(420, 96);
+        const owned = this.progress.ownedOutfits.indexOf(outfit.id) >= 0;
+        const equipped = this.progress.equippedOutfit === outfit.id;
+        const graphics = row.addComponent(Graphics);
+        graphics.fillColor = equipped
+            ? new Color(outfit.accent.r, outfit.accent.g, outfit.accent.b, 80)
+            : new Color(255, 251, 254, 240);
+        graphics.strokeColor = equipped ? outfit.accent : new Color(239, 216, 235, 230);
+        graphics.lineWidth = equipped ? 4 : 2;
+        graphics.roundRect(-210, -48, 420, 96, 22);
+        graphics.fill();
+        graphics.stroke();
+
+        graphics.fillColor = outfit.accent;
+        graphics.circle(-174, 0, 25);
+        graphics.fill();
+        this.addLabel(
+            row,
+            'OutfitName',
+            outfit.name,
+            21,
+            new Color(101, 65, 109, 255),
+            new Vec3(-92, 20),
+            190,
+            32,
+            true,
+        );
+        this.addLabel(
+            row,
+            'OutfitInfo',
+            `${outfit.tags.join(' · ')}  ${outfit.bonusLabel}`,
+            14,
+            new Color(145, 99, 143, 230),
+            new Vec3(-92, -20),
+            190,
+            28,
+            true,
+        );
+        const status = equipped
+            ? '穿戴中'
+            : owned
+                ? '点击穿戴'
+                : `${outfit.price} 金币`;
+        this.addLabel(
+            row,
+            'OutfitStatus',
+            status,
+            16,
+            equipped
+                ? new Color(179, 76, 137, 255)
+                : new Color(126, 84, 132, 255),
+            new Vec3(137, 0),
+            120,
+            38,
+            true,
+        );
+        this.makeInteractive(row, () => this.chooseOutfit(outfit));
+    }
+
+    private chooseOutfit(outfit: OutfitDefinition): void {
+        const owned = this.progress.ownedOutfits.indexOf(outfit.id) >= 0;
+        if (!owned && this.progress.coins < outfit.price) {
+            if (this.wardrobeMessageLabel?.isValid) {
+                this.wardrobeMessageLabel.string = `金币不足，还需要 ${outfit.price - this.progress.coins}`;
+            }
+            return;
+        }
+
+        if (!owned) {
+            this.progress = {
+                ...this.progress,
+                coins: this.progress.coins - outfit.price,
+                ownedOutfits: [...this.progress.ownedOutfits, outfit.id],
+                equippedOutfit: outfit.id,
+            };
+            if (this.wardrobeMessageLabel?.isValid) {
+                this.wardrobeMessageLabel.string = `购买并穿上：${outfit.name}`;
+            }
+            gameFeel.play('gift');
+        } else {
+            this.progress = {
+                ...this.progress,
+                equippedOutfit: outfit.id,
+            };
+            if (this.wardrobeMessageLabel?.isValid) {
+                this.wardrobeMessageLabel.string = `已穿上：${outfit.name}`;
+            }
+        }
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        this.updateWardrobePreview();
+        this.renderWardrobeList();
+    }
+
+    private updateWardrobePreview(): void {
+        const outfit = getOutfit(this.progress.equippedOutfit);
+        if (this.wardrobePreviewCaption?.isValid) {
+            this.wardrobePreviewCaption.string = `${outfit.name}\n${outfit.tags.join(' · ')}`;
+        }
+        const previewAccessory = this.wardrobePreviewVisual?.getChildByName('PreviewOutfitAccessory');
+        if (previewAccessory?.isValid) {
+            this.drawOutfitAccessory(previewAccessory, outfit.id);
+        }
+        if (this.playerOutfitAccessory?.isValid) {
+            this.drawOutfitAccessory(this.playerOutfitAccessory, outfit.id);
+        }
+    }
+
+    private drawOutfitAccessory(node: Node, outfitId: string): void {
+        const graphics = node.getComponent(Graphics);
+        if (!graphics) {
+            return;
+        }
+        const outfit = getOutfit(outfitId);
+        graphics.clear();
+        graphics.fillColor = outfit.accent;
+        graphics.strokeColor = new Color(255, 255, 255, 225);
+        graphics.lineWidth = 3;
+
+        if (outfit.accessory === 'flower') {
+            graphics.circle(-34, 1, 8);
+            graphics.circle(-44, -7, 10);
+            graphics.circle(-25, -10, 10);
+            graphics.circle(-32, -19, 8);
+            graphics.fill();
+            graphics.fillColor = new Color(255, 236, 164, 255);
+            graphics.circle(-33, -8, 6);
+            graphics.fill();
+        } else if (outfit.accessory === 'stars') {
+            for (let index = 0; index < 5; index += 1) {
+                const angle = Math.PI * 2 * index / 5;
+                graphics.circle(Math.cos(angle) * 66, 52 + Math.sin(angle) * 40, 6);
+            }
+            graphics.fill();
+        } else if (outfit.accessory === 'street') {
+            graphics.strokeColor = outfit.accent;
+            graphics.lineWidth = 7;
+            graphics.moveTo(-42, 52);
+            graphics.lineTo(42, 52);
+            graphics.stroke();
+            graphics.fillColor = outfit.accent;
+            graphics.circle(-45, 45, 13);
+            graphics.circle(45, 45, 13);
+            graphics.fill();
+        } else if (outfit.accessory === 'academy') {
+            graphics.fillColor = outfit.accent;
+            graphics.moveTo(-50, 73);
+            graphics.lineTo(28, 73);
+            graphics.lineTo(52, 92);
+            graphics.lineTo(-22, 96);
+            graphics.close();
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 239, 218, 235);
+            graphics.lineWidth = 6;
+            graphics.moveTo(-48, 20);
+            graphics.lineTo(44, 20);
+            graphics.stroke();
+        } else {
+            graphics.fillColor = new Color(255, 238, 247, 220);
+            graphics.circle(-52, 48, 7);
+            graphics.circle(50, 18, 5);
+            graphics.circle(-38, -26, 4);
+            graphics.fill();
+        }
+    }
+
+    private closeWardrobe(): void {
+        if (this.wardrobeModal?.isValid) {
+            this.wardrobeModal.destroy();
+        }
+        this.wardrobeModal = null;
+        this.wardrobeList = null;
+        this.wardrobeCoinLabel = null;
+        this.wardrobeMessageLabel = null;
+        this.wardrobePreviewVisual = null;
+        this.wardrobePreviewCaption = null;
+        this.updateJobProximity();
+    }
+
+    private updateJobProximity(): void {
+        if (!this.jobPromptButton?.isValid) {
+            return;
+        }
+        if (this.jobModal?.isValid || this.wardrobeModal?.isValid) {
+            this.jobPromptButton.active = false;
+            return;
+        }
+
+        let nearest: CityJob | null = null;
+        let nearestDistance = 120 * 120;
+        for (const job of CITY_JOBS) {
+            const dx = this.player.position.x - job.x;
+            const dy = this.player.position.y - job.y;
+            const distance = dx * dx + dy * dy;
+            if (distance < nearestDistance) {
+                nearest = job;
+                nearestDistance = distance;
+            }
+        }
+        this.currentJob = nearest;
+        this.jobPromptButton.active = Boolean(nearest);
+        if (nearest && this.jobPromptLabel?.isValid) {
+            this.jobPromptLabel.string = `${nearest.building}\n${nearest.action}`;
+        }
+    }
+
+    private openCurrentJob(): void {
+        if (!this.currentJob || this.jobModal?.isValid) {
+            return;
+        }
+        const job = this.currentJob;
+        this.jobPromptButton.active = false;
+        this.jobActive = false;
+        this.jobCompleted = false;
+        this.jobRound = 0;
+        this.jobRoundIncome = 0;
+        this.jobTotalIncome = 0;
+
+        const modal = this.createNode('JobModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(47, 28, 57, 165);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('JobPanel', modal);
+        panel.setPosition(0, 15);
+        panel.getComponent(UITransform)?.setContentSize(620, 610);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 252, 252);
+        graphics.strokeColor = job.accent;
+        graphics.lineWidth = 5;
+        graphics.roundRect(-310, -305, 620, 610, 38);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = job.accent;
+        graphics.roundRect(-132, 222, 264, 62, 31);
+        graphics.fill();
+
+        this.addLabel(
+            panel,
+            'JobTitle',
+            job.building,
+            31,
+            Color.WHITE,
+            new Vec3(0, 253),
+            450,
+            56,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'JobSubtitle',
+            `${job.action} · 三轮时机判定`,
+            20,
+            new Color(137, 91, 139, 235),
+            new Vec3(0, 187),
+            480,
+            38,
+            true,
+        );
+
+        this.jobTrack = this.createNode('JobTimingTrack', panel);
+        this.jobTrack.setPosition(0, 75);
+        this.jobTrack.getComponent(UITransform)?.setContentSize(500, 70);
+        const trackGraphics = this.jobTrack.addComponent(Graphics);
+        trackGraphics.fillColor = new Color(247, 226, 241, 245);
+        trackGraphics.roundRect(-250, -20, 500, 40, 20);
+        trackGraphics.fill();
+        trackGraphics.strokeColor = new Color(255, 255, 255, 235);
+        trackGraphics.lineWidth = 2;
+        trackGraphics.roundRect(-250, -20, 500, 40, 20);
+        trackGraphics.stroke();
+
+        this.jobTarget = this.createNode('JobTargetZone', this.jobTrack);
+        this.jobTarget.getComponent(UITransform)?.setContentSize(72, 48);
+        const targetGraphics = this.jobTarget.addComponent(Graphics);
+        targetGraphics.fillColor = new Color(job.accent.r, job.accent.g, job.accent.b, 145);
+        targetGraphics.roundRect(-36, -24, 72, 48, 15);
+        targetGraphics.fill();
+
+        this.jobMarker = this.createNode('JobMarker', this.jobTrack);
+        this.jobMarker.getComponent(UITransform)?.setContentSize(18, 54);
+        const markerGraphics = this.jobMarker.addComponent(Graphics);
+        markerGraphics.fillColor = new Color(112, 69, 120, 255);
+        markerGraphics.roundRect(-9, -27, 18, 54, 9);
+        markerGraphics.fill();
+
+        this.jobStatusLabel = this.addLabel(
+            panel,
+            'JobStatus',
+            '点击“停止”，让指针落在高亮区域',
+            21,
+            new Color(100, 67, 108, 255),
+            new Vec3(0, -32),
+            510,
+            50,
+            true,
+        );
+        this.jobCoinLabel = this.addLabel(
+            panel,
+            'JobCoinLabel',
+            `当前金币：${this.progress.coins}`,
+            18,
+            new Color(159, 109, 80, 245),
+            new Vec3(0, -84),
+            360,
+            36,
+            true,
+        );
+        const actionButton = this.createPanelButton(
+            panel,
+            'JobActionButton',
+            '停止',
+            new Vec3(0, -165),
+            300,
+            74,
+            job.accent,
+            () => this.handleJobAction(),
+        );
+        this.jobStopLabel = actionButton
+            .getChildByName('ButtonLabel')
+            ?.getComponent(Label) ?? null;
+        this.createPanelButton(
+            panel,
+            'CloseJobButton',
+            '暂时离开',
+            new Vec3(0, -252),
+            230,
+            50,
+            new Color(218, 197, 229, 255),
+            () => this.closeJobModal(),
+        );
+
+        this.jobModal = modal;
+        this.beginJobRound();
+    }
+
+    private createPanelButton(
+        parent: Node,
+        name: string,
+        text: string,
+        position: Vec3,
+        width: number,
+        height: number,
+        accent: Color,
+        onTap: () => void,
+    ): Node {
+        const button = this.createNode(name, parent);
+        button.setPosition(position);
+        button.getComponent(UITransform)?.setContentSize(width, height);
+        const graphics = button.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 250, 253, 245);
+        graphics.strokeColor = accent;
+        graphics.lineWidth = 4;
+        graphics.roundRect(-width / 2, -height / 2, width, height, height / 2);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(accent.r, accent.g, accent.b, 45);
+        graphics.roundRect(-width / 2 + 8, -height / 2 + 8, width - 16, height - 16, (height - 16) / 2);
+        graphics.fill();
+        this.addLabel(
+            button,
+            'ButtonLabel',
+            text,
+            24,
+            new Color(107, 68, 114, 255),
+            Vec3.ZERO,
+            width - 28,
+            height - 18,
+            true,
+        );
+        this.makeInteractive(button, onTap);
+        return button;
+    }
+
+    private beginJobRound(): void {
+        if (!this.jobModal?.isValid || !this.jobMarker?.isValid || !this.jobTarget?.isValid) {
+            return;
+        }
+        if (this.jobRound >= 3) {
+            this.jobCompleted = true;
+            this.jobActive = false;
+            if (this.jobStatusLabel?.isValid) {
+                this.jobStatusLabel.string = `工作完成 · 本次收入 ${this.jobTotalIncome} 金币`;
+            }
+            if (this.jobStopLabel?.isValid) {
+                this.jobStopLabel.string = '再做一次';
+            }
+            this.jobMarker.active = false;
+            this.jobTarget.active = false;
+            return;
+        }
+
+        this.jobRound += 1;
+        this.jobRoundIncome = 0;
+        this.jobTargetValue = -0.72 + Math.random() * 1.44;
+        this.jobTarget.setPosition(225 * this.jobTargetValue, 0);
+        this.jobTarget.active = true;
+        this.jobMarker.active = true;
+        this.jobMarkerValue = -1;
+        this.jobDirection = 1;
+        this.jobSpeed = 1.12 + this.jobRound * 0.22;
+        this.jobActive = true;
+        this.jobCompleted = false;
+        if (this.jobStatusLabel?.isValid) {
+            this.jobStatusLabel.string = `第 ${this.jobRound} / 3 轮 · 点击“停止”`;
+        }
+        if (this.jobStopLabel?.isValid) {
+            this.jobStopLabel.string = '停止';
+        }
+    }
+
+    private updateJob(deltaTime: number): void {
+        if (!this.jobActive || !this.jobMarker?.isValid) {
+            return;
+        }
+        this.jobMarkerValue += this.jobDirection * this.jobSpeed * deltaTime;
+        if (this.jobMarkerValue >= 1) {
+            this.jobMarkerValue = 1;
+            this.jobDirection = -1;
+        } else if (this.jobMarkerValue <= -1) {
+            this.jobMarkerValue = -1;
+            this.jobDirection = 1;
+        }
+        this.jobMarker.setPosition(225 * this.jobMarkerValue, 0);
+    }
+
+    private handleJobAction(): void {
+        if (this.jobActive) {
+            this.stopJobRound();
+            return;
+        }
+        if (this.jobCompleted) {
+            this.jobRound = 0;
+            this.jobTotalIncome = 0;
+            this.jobCompleted = false;
+        }
+        this.beginJobRound();
+    }
+
+    private stopJobRound(): void {
+        if (!this.jobActive || !this.currentJob) {
+            return;
+        }
+        this.jobActive = false;
+        const distance = Math.abs(this.jobMarkerValue - this.jobTargetValue);
+        const accuracy = Math.max(0, Math.min(1, 1 - distance / 0.38));
+        const reward = this.currentJob.baseReward
+            + Math.round(this.currentJob.bonusReward * accuracy);
+        this.jobRoundIncome += reward;
+        this.jobTotalIncome += reward;
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins + reward,
+        };
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        gameFeel.play('success');
+        if (this.jobStatusLabel?.isValid) {
+            this.jobStatusLabel.string = `本轮 +${reward} 金币 · 准确度 ${Math.round(accuracy * 100)}%`;
+        }
+        if (this.jobRound >= 3) {
+            this.jobCompleted = true;
+            if (this.jobMarker?.isValid) {
+                this.jobMarker.active = false;
+            }
+            if (this.jobTarget?.isValid) {
+                this.jobTarget.active = false;
+            }
+            if (this.jobStopLabel?.isValid) {
+                this.jobStopLabel.string = '再做一次';
+            }
+        } else if (this.jobStopLabel?.isValid) {
+            this.jobStopLabel.string = '下一轮';
+        }
+    }
+
+    private closeJobModal(): void {
+        this.jobActive = false;
+        this.jobCompleted = false;
+        if (this.jobModal?.isValid) {
+            this.jobModal.destroy();
+        }
+        this.jobModal = null;
+        this.jobTrack = null;
+        this.jobMarker = null;
+        this.jobTarget = null;
+        this.jobStatusLabel = null;
+        this.jobStopLabel = null;
+        this.jobCoinLabel = null;
+        this.updateJobProximity();
+    }
+
+    private updateCoinLabel(): void {
+        if (this.coinLabel?.isValid) {
+            this.coinLabel.string = `金币 ${this.progress.coins}`;
+        }
+        if (this.jobCoinLabel?.isValid) {
+            this.jobCoinLabel.string = `当前金币：${this.progress.coins}`;
+        }
+        if (this.wardrobeCoinLabel?.isValid) {
+            this.wardrobeCoinLabel.string = `金币 ${this.progress.coins}`;
+        }
     }
 
     private bindKeyboard(): void {

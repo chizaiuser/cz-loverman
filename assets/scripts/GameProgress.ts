@@ -1,5 +1,6 @@
 import { sys } from 'cc';
 import { ChoiceEffects, PlayerStatKey, StatRequirement } from './StoryData';
+import { DEFAULT_OUTFIT_ID } from './WardrobeData';
 
 const SAVE_KEY = 'loverman.save.v1';
 const LEGACY_ZODIAC_KEY = 'loverman.zodiac';
@@ -13,10 +14,13 @@ export interface PlayerProgress {
     personality: string;
     stats: PlayerStats;
     clues: string[];
+    coins: number;
     gifts: number;
     hearts: number;
     bonds: Record<string, number>;
     unlockedCharacters: string[];
+    ownedOutfits: string[];
+    equippedOutfit: string;
     completedEvents: string[];
     selectedChoices: Record<string, string>;
 }
@@ -64,10 +68,13 @@ export function createDefaultProgress(): PlayerProgress {
         personality: '',
         stats: { ...BASE_STATS },
         clues: [],
+        coins: 0,
         gifts: 1,
         hearts: 3,
         bonds: {},
         unlockedCharacters: ['jiang-yanbai', 'xia-yang', 'lu-qinglan'],
+        ownedOutfits: [DEFAULT_OUTFIT_ID],
+        equippedOutfit: DEFAULT_OUTFIT_ID,
         completedEvents: [],
         selectedChoices: {},
     };
@@ -104,6 +111,18 @@ export function loadProgress(): PlayerProgress {
     try {
         const parsed = JSON.parse(raw) as Partial<PlayerProgress>;
         const stats = parsed.stats ?? defaults.stats;
+        const unlockedCharacters = thisStringArray(
+            parsed.unlockedCharacters,
+            defaults.unlockedCharacters,
+        );
+        const ownedOutfits = thisStringArray(parsed.ownedOutfits, defaults.ownedOutfits);
+        if (ownedOutfits.indexOf(DEFAULT_OUTFIT_ID) < 0) {
+            ownedOutfits.unshift(DEFAULT_OUTFIT_ID);
+        }
+        const equippedOutfit = typeof parsed.equippedOutfit === 'string'
+            && ownedOutfits.indexOf(parsed.equippedOutfit) >= 0
+            ? parsed.equippedOutfit
+            : DEFAULT_OUTFIT_ID;
         return {
             ...defaults,
             ...parsed,
@@ -115,13 +134,13 @@ export function loadProgress(): PlayerProgress {
                 insight: thisNumber(stats.insight, defaults.stats.insight),
             },
             clues: thisStringArray(parsed.clues, defaults.clues),
+            coins: Math.max(0, thisNumber(parsed.coins, defaults.coins)),
             gifts: thisNumber(parsed.gifts, defaults.gifts),
             hearts: Math.min(6, thisNumber(parsed.hearts, defaults.hearts)),
             bonds: parsed.bonds && typeof parsed.bonds === 'object' ? parsed.bonds : {},
-            unlockedCharacters: thisStringArray(
-                parsed.unlockedCharacters,
-                defaults.unlockedCharacters,
-            ),
+            unlockedCharacters,
+            ownedOutfits,
+            equippedOutfit,
             completedEvents: thisStringArray(parsed.completedEvents, defaults.completedEvents),
             selectedChoices: parsed.selectedChoices && typeof parsed.selectedChoices === 'object'
                 ? parsed.selectedChoices
@@ -194,6 +213,22 @@ export function meetsRequirement(stats: PlayerStats, requirement?: StatRequireme
     return stats[requirement.stat] >= requirement.minimum;
 }
 
+export function getEffectiveStats(progress: PlayerProgress): PlayerStats {
+    const stats = { ...progress.stats };
+    const bonuses: Record<string, Partial<PlayerStats>> = {
+        'sakura-default': { emotion: 1 },
+        'mint-florist': { insight: 1 },
+        'starlight-gown': { beauty: 1 },
+        'street-pop': { insight: 1 },
+        'academy-retro': { wisdom: 1 },
+    };
+    const bonus = bonuses[progress.equippedOutfit] ?? {};
+    (Object.keys(bonus) as PlayerStatKey[]).forEach((key) => {
+        stats[key] = Math.min(5, stats[key] + Number(bonus[key] ?? 0));
+    });
+    return stats;
+}
+
 export function statLabel(stat: PlayerStatKey): string {
     return {
         wisdom: '才智',
@@ -214,6 +249,7 @@ function cloneProgress(progress: PlayerProgress): PlayerProgress {
         clues: [...progress.clues],
         bonds: { ...progress.bonds },
         unlockedCharacters: [...progress.unlockedCharacters],
+        ownedOutfits: [...progress.ownedOutfits],
         completedEvents: [...progress.completedEvents],
         selectedChoices: { ...progress.selectedChoices },
     };

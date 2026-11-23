@@ -18,6 +18,7 @@ import {
 } from 'cc';
 import {
     applyChoice,
+    getEffectiveStats,
     getBond,
     loadProgress,
     meetsRequirement,
@@ -28,6 +29,7 @@ import {
 } from './GameProgress';
 import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
 import { FeelSettings, gameFeel } from './GameFeel';
+import { getOutfit } from './WardrobeData';
 
 const { ccclass } = _decorator;
 
@@ -454,10 +456,11 @@ export class GameApp extends Component {
             120,
             true,
         );
+        const effectiveStats = getEffectiveStats(this.progress);
         this.addLabel(
             panel,
             'CurrentStats',
-            `才智 ${this.progress.stats.wisdom} · 美貌 ${this.progress.stats.beauty} · 情商 ${this.progress.stats.emotion} · 洞察 ${this.progress.stats.insight}`,
+            `才智 ${effectiveStats.wisdom} · 美貌 ${effectiveStats.beauty} · 情商 ${effectiveStats.emotion} · 洞察 ${effectiveStats.insight}`,
             17,
             new Color(142, 99, 145, 230),
             new Vec3(0, 125),
@@ -505,7 +508,7 @@ export class GameApp extends Component {
     }
 
     private createChoiceButton(parent: Node, choice: StoryChoice, y: number): void {
-        const available = meetsRequirement(this.progress.stats, choice.requirement);
+        const available = meetsRequirement(getEffectiveStats(this.progress), choice.requirement);
         const button = this.createUiNode(`Choice_${choice.id}`, parent);
         button.setPosition(0, y);
         button.getComponent(UITransform)?.setContentSize(550, 94);
@@ -629,6 +632,7 @@ export class GameApp extends Component {
 
     private showProgressSummary(): void {
         const complete = this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0;
+        const effectiveStats = getEffectiveStats(this.progress);
         const clueNames = this.progress.clues.map((id) => {
             if (id === SWEET_SHOP_CHAPTER.clueId) {
                 return SWEET_SHOP_CHAPTER.clueTitle;
@@ -641,9 +645,11 @@ export class GameApp extends Component {
         this.showModal(
             '线索簿',
             `身份：${this.progress.zodiac || '未选择'} · ${this.progress.personality || '未选择'}\n`
-                + `属性：才智 ${this.progress.stats.wisdom} / 美貌 ${this.progress.stats.beauty} / `
-                + `情商 ${this.progress.stats.emotion} / 洞察 ${this.progress.stats.insight}\n\n`
+                + `属性：才智 ${effectiveStats.wisdom} / 美貌 ${effectiveStats.beauty} / `
+                + `情商 ${effectiveStats.emotion} / 洞察 ${effectiveStats.insight}\n\n`
                 + `已记录线索：${clueNames.length > 0 ? clueNames.join('、') : '暂无'}\n`
+                + `金币：${this.progress.coins}\n`
+                + `当前服装：${getOutfit(this.progress.equippedOutfit).name}\n`
                 + `礼物：${this.progress.gifts} 份\n`
                 + `沈星澜心动值：${getBond(this.progress, SWEET_SHOP_CHAPTER.characterId)}/6\n\n`
                 + (complete ? '第一章已完成。' : SWEET_SHOP_CHAPTER.objective),
