@@ -27,6 +27,11 @@ import {
     saveProgress,
 } from './GameProgress';
 import { getOutfit, OUTFITS, OutfitDefinition } from './WardrobeData';
+import {
+    getPartnerSupport,
+    PARTNERS,
+    PartnerSupport,
+} from './PartnerData';
 
 const { ccclass } = _decorator;
 
@@ -122,6 +127,13 @@ export class CityExplore extends Component {
     private wardrobeMessageLabel: Label | null = null;
     private wardrobePreviewVisual: Node | null = null;
     private wardrobePreviewCaption: Label | null = null;
+    private partnerButton!: Node;
+    private partnerButtonLabel!: Label;
+    private partnerModal: Node | null = null;
+    private partnerList: Node | null = null;
+    private partnerPageLabel: Label | null = null;
+    private partnerActiveLabel: Label | null = null;
+    private partnerPage = 0;
     private jobActive = false;
     private jobCompleted = false;
     private jobRound = 0;
@@ -158,7 +170,11 @@ export class CityExplore extends Component {
         if (!this.player?.isValid) {
             return;
         }
-        if (this.jobModal?.isValid || this.wardrobeModal?.isValid) {
+        if (
+            this.jobModal?.isValid
+            || this.wardrobeModal?.isValid
+            || this.partnerModal?.isValid
+        ) {
             if (this.jobActive) {
                 this.updateJob(deltaTime);
             }
@@ -571,6 +587,18 @@ export class CityExplore extends Component {
             38,
             true,
         );
+        this.partnerButton = this.createHudButton(
+            'PartnerButton',
+            '搭档',
+            new Vec3(285, 365),
+            160,
+            58,
+            () => this.openPartnerPanel(),
+        );
+        this.partnerButtonLabel = this.partnerButton
+            .getChildByName('ButtonLabel')!
+            .getComponent(Label)!;
+        this.updatePartnerButtonLabel();
 
         this.createHudButton('CityBackButton', '返回市集', new Vec3(-285, 500), 124, 56, () => {
             director.loadScene('Main');
@@ -724,7 +752,7 @@ export class CityExplore extends Component {
         graphics.roundRect(-110, 400, 220, 62, 31);
         graphics.fill();
 
-        this.addLabel(
+        this.partnerActiveLabel = this.addLabel(
             panel,
             'WardrobeTitle',
             '衣 橱',
@@ -1015,11 +1043,281 @@ export class CityExplore extends Component {
         this.updateJobProximity();
     }
 
+    private openPartnerPanel(): void {
+        if (this.partnerModal?.isValid) {
+            return;
+        }
+        this.jobPromptButton.active = false;
+        this.partnerPage = 0;
+        const modal = this.createNode('PartnerModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(43, 27, 57, 170);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('PartnerPanel', modal);
+        panel.getComponent(UITransform)?.setContentSize(680, 930);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 252, 252);
+        graphics.strokeColor = new Color(209, 161, 228, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-340, -465, 680, 930, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(204, 151, 225, 255);
+        graphics.roundRect(-126, 380, 252, 64, 32);
+        graphics.fill();
+        this.addLabel(panel, 'PartnerTitle', '选择支援搭档', 32, Color.WHITE, new Vec3(0, 412), 340, 58, true);
+
+        const active = getPartnerSupport(this.progress.activePartner);
+        this.addLabel(
+            panel,
+            'ActivePartner',
+            active ? `当前：${active.name} · ${this.partnerSupportText(active)}` : '当前未选择搭档',
+            18,
+            new Color(139, 94, 148, 235),
+            new Vec3(0, 338),
+            570,
+            42,
+            true,
+        );
+
+        this.partnerList = this.createNode('PartnerList', panel);
+        this.partnerList.getComponent(UITransform)?.setContentSize(620, 560);
+        this.renderPartnerPage();
+
+        this.createPanelButton(
+            panel,
+            'PreviousPartnerPage',
+            '‹',
+            new Vec3(-235, -342),
+            62,
+            52,
+            new Color(202, 170, 235, 255),
+            () => {
+                this.partnerPage = Math.max(0, this.partnerPage - 1);
+                this.renderPartnerPage();
+            },
+        );
+        this.partnerPageLabel = this.addLabel(
+            panel,
+            'PartnerPageLabel',
+            '',
+            17,
+            new Color(121, 85, 130, 230),
+            new Vec3(0, -342),
+            340,
+            36,
+            true,
+        );
+        this.createPanelButton(
+            panel,
+            'NextPartnerPage',
+            '›',
+            new Vec3(235, -342),
+            62,
+            52,
+            new Color(202, 170, 235, 255),
+            () => {
+                const partners = this.getUnlockedPartners();
+                const maxPage = Math.max(0, Math.ceil(partners.length / 6) - 1);
+                this.partnerPage = Math.min(maxPage, this.partnerPage + 1);
+                this.renderPartnerPage();
+            },
+        );
+        this.createPanelButton(
+            panel,
+            'ClosePartnerPanel',
+            '关闭',
+            new Vec3(0, -410),
+            230,
+            50,
+            new Color(213, 182, 225, 255),
+            () => this.closePartnerPanel(),
+        );
+        this.partnerModal = modal;
+        this.renderPartnerPage();
+    }
+
+    private getUnlockedPartners(): PartnerSupport[] {
+        return PARTNERS.filter((partner) => (
+            this.progress.unlockedCharacters.indexOf(partner.id) >= 0
+        ));
+    }
+
+    private renderPartnerPage(): void {
+        if (!this.partnerList?.isValid) {
+            return;
+        }
+        for (const child of [...this.partnerList.children]) {
+            child.destroy();
+        }
+        const partners = this.getUnlockedPartners();
+        const totalPages = Math.max(1, Math.ceil(partners.length / 6));
+        this.partnerPage = Math.max(0, Math.min(totalPages - 1, this.partnerPage));
+        if (this.partnerPageLabel?.isValid) {
+            this.partnerPageLabel.string = `${this.partnerPage + 1} / ${totalPages}　已解锁 ${partners.length} 人`;
+        }
+        if (partners.length === 0) {
+            this.addLabel(
+                this.partnerList,
+                'NoPartners',
+                '还没有可支援的男性角色\n先完成剧情解锁图鉴角色',
+                21,
+                new Color(138, 99, 143, 230),
+                new Vec3(0, 50),
+                440,
+                90,
+                true,
+            );
+            return;
+        }
+
+        const pagePartners = partners.slice(this.partnerPage * 6, this.partnerPage * 6 + 6);
+        const columns = [-155, 155];
+        const rows = [245, 55, -135];
+        pagePartners.forEach((partner, index) => {
+            this.createPartnerCard(
+                partner,
+                columns[index % 2],
+                rows[Math.floor(index / 2)],
+            );
+        });
+    }
+
+    private createPartnerCard(partner: PartnerSupport, x: number, y: number): void {
+        if (!this.partnerList?.isValid) {
+            return;
+        }
+        const active = this.progress.activePartner === partner.id;
+        const card = this.createNode(`Partner_${partner.id}`, this.partnerList);
+        card.setPosition(x, y);
+        card.getComponent(UITransform)?.setContentSize(280, 156);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = active
+            ? new Color(partner.accent.r, partner.accent.g, partner.accent.b, 88)
+            : new Color(255, 251, 254, 240);
+        graphics.strokeColor = active ? partner.accent : new Color(238, 219, 239, 230);
+        graphics.lineWidth = active ? 4 : 2;
+        graphics.roundRect(-140, -78, 280, 156, 24);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = partner.accent;
+        graphics.circle(-105, 22, 24);
+        graphics.fill();
+        this.addLabel(
+            card,
+            'PartnerName',
+            partner.name,
+            21,
+            new Color(101, 65, 110, 255),
+            new Vec3(20, 38),
+            190,
+            32,
+            true,
+        );
+        this.addLabel(
+            card,
+            'PartnerRole',
+            partner.role,
+            15,
+            new Color(146, 99, 147, 230),
+            new Vec3(20, 7),
+            190,
+            26,
+            true,
+        );
+        this.addLabel(
+            card,
+            'PartnerSupport',
+            this.partnerSupportText(partner),
+            15,
+            new Color(126, 82, 136, 255),
+            new Vec3(0, -34),
+            240,
+            42,
+            true,
+        );
+        if (active) {
+            this.addLabel(
+                card,
+                'ActiveTag',
+                '支援中',
+                14,
+                new Color(190, 75, 138, 255),
+                new Vec3(92, 56),
+                76,
+                28,
+                true,
+            );
+        }
+        this.makeInteractive(card, () => {
+            this.progress = {
+                ...this.progress,
+                activePartner: partner.id,
+            };
+            saveProgress(this.progress);
+            this.updatePartnerButtonLabel();
+            if (this.partnerActiveLabel?.isValid) {
+                this.partnerActiveLabel.string = `当前：${partner.name} · ${this.partnerSupportText(partner)}`;
+            }
+            this.renderPartnerPage();
+            gameFeel.play('success');
+        });
+    }
+
+    private partnerSupportText(partner: PartnerSupport): string {
+        const statName = {
+            wisdom: '才智',
+            beauty: '美貌',
+            emotion: '情商',
+            insight: '洞察',
+        }[partner.stat];
+        const jobNames: Record<string, string> = {
+            cafe: '咖啡',
+            sweet: '甜品',
+            stage: '舞台',
+        };
+        const jobText = ['cafe', 'sweet', 'stage']
+            .filter((job) => Boolean(partner.jobBonuses[job]))
+            .map((job) => `${jobNames[job]}+${partner.jobBonuses[job]}`)
+            .join(' ');
+        return `${statName}+${partner.statBonus}  ${jobText}`;
+    }
+
+    private updatePartnerButtonLabel(): void {
+        const partner = getPartnerSupport(this.progress.activePartner);
+        if (this.partnerButtonLabel?.isValid) {
+            this.partnerButtonLabel.string = partner ? `搭档\n${partner.name}` : '选择搭档';
+        }
+    }
+
+    private closePartnerPanel(): void {
+        if (this.partnerModal?.isValid) {
+            this.partnerModal.destroy();
+        }
+        this.partnerModal = null;
+        this.partnerList = null;
+        this.partnerPageLabel = null;
+        this.partnerActiveLabel = null;
+        this.updateJobProximity();
+    }
+
     private updateJobProximity(): void {
         if (!this.jobPromptButton?.isValid) {
             return;
         }
-        if (this.jobModal?.isValid || this.wardrobeModal?.isValid) {
+        if (
+            this.jobModal?.isValid
+            || this.wardrobeModal?.isValid
+            || this.partnerModal?.isValid
+        ) {
             this.jobPromptButton.active = false;
             return;
         }
@@ -1289,8 +1587,11 @@ export class CityExplore extends Component {
         this.jobActive = false;
         const distance = Math.abs(this.jobMarkerValue - this.jobTargetValue);
         const accuracy = Math.max(0, Math.min(1, 1 - distance / 0.38));
+        const partner = getPartnerSupport(this.progress.activePartner);
+        const partnerBonus = partner?.jobBonuses[this.currentJob.id] ?? 0;
         const reward = this.currentJob.baseReward
-            + Math.round(this.currentJob.bonusReward * accuracy);
+            + Math.round(this.currentJob.bonusReward * accuracy)
+            + partnerBonus;
         this.jobRoundIncome += reward;
         this.jobTotalIncome += reward;
         this.progress = {
@@ -1301,7 +1602,8 @@ export class CityExplore extends Component {
         this.updateCoinLabel();
         gameFeel.play('success');
         if (this.jobStatusLabel?.isValid) {
-            this.jobStatusLabel.string = `本轮 +${reward} 金币 · 准确度 ${Math.round(accuracy * 100)}%`;
+            this.jobStatusLabel.string = `本轮 +${reward} 金币 · 准确度 ${Math.round(accuracy * 100)}%`
+                + (partnerBonus > 0 ? ` · 搭档 +${partnerBonus}` : '');
         }
         if (this.jobRound >= 3) {
             this.jobCompleted = true;

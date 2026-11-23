@@ -30,6 +30,7 @@ import {
 import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
 import { FeelSettings, gameFeel } from './GameFeel';
 import { getOutfit } from './WardrobeData';
+import { getPartnerSupport } from './PartnerData';
 
 const { ccclass } = _decorator;
 
@@ -633,6 +634,7 @@ export class GameApp extends Component {
     private showProgressSummary(): void {
         const complete = this.progress.completedEvents.indexOf(SWEET_SHOP_CHAPTER.id) >= 0;
         const effectiveStats = getEffectiveStats(this.progress);
+        const activePartner = getPartnerSupport(this.progress.activePartner);
         const clueNames = this.progress.clues.map((id) => {
             if (id === SWEET_SHOP_CHAPTER.clueId) {
                 return SWEET_SHOP_CHAPTER.clueTitle;
@@ -650,6 +652,7 @@ export class GameApp extends Component {
                 + `已记录线索：${clueNames.length > 0 ? clueNames.join('、') : '暂无'}\n`
                 + `金币：${this.progress.coins}\n`
                 + `当前服装：${getOutfit(this.progress.equippedOutfit).name}\n`
+                + `支援搭档：${activePartner?.name ?? '未选择'}\n`
                 + `礼物：${this.progress.gifts} 份\n`
                 + `沈星澜心动值：${getBond(this.progress, SWEET_SHOP_CHAPTER.characterId)}/6\n\n`
                 + (complete ? '第一章已完成。' : SWEET_SHOP_CHAPTER.objective),

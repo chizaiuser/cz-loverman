@@ -1,6 +1,7 @@
 import { sys } from 'cc';
 import { ChoiceEffects, PlayerStatKey, StatRequirement } from './StoryData';
 import { DEFAULT_OUTFIT_ID } from './WardrobeData';
+import { getPartnerSupport, PARTNERS } from './PartnerData';
 
 const SAVE_KEY = 'loverman.save.v1';
 const LEGACY_ZODIAC_KEY = 'loverman.zodiac';
@@ -21,6 +22,7 @@ export interface PlayerProgress {
     unlockedCharacters: string[];
     ownedOutfits: string[];
     equippedOutfit: string;
+    activePartner: string;
     completedEvents: string[];
     selectedChoices: Record<string, string>;
 }
@@ -75,6 +77,7 @@ export function createDefaultProgress(): PlayerProgress {
         unlockedCharacters: ['jiang-yanbai', 'xia-yang', 'lu-qinglan'],
         ownedOutfits: [DEFAULT_OUTFIT_ID],
         equippedOutfit: DEFAULT_OUTFIT_ID,
+        activePartner: 'jiang-yanbai',
         completedEvents: [],
         selectedChoices: {},
     };
@@ -123,6 +126,11 @@ export function loadProgress(): PlayerProgress {
             && ownedOutfits.indexOf(parsed.equippedOutfit) >= 0
             ? parsed.equippedOutfit
             : DEFAULT_OUTFIT_ID;
+        const activePartner = typeof parsed.activePartner === 'string'
+            && unlockedCharacters.indexOf(parsed.activePartner) >= 0
+            && Boolean(getPartnerSupport(parsed.activePartner))
+            ? parsed.activePartner
+            : PARTNERS.find((partner) => unlockedCharacters.indexOf(partner.id) >= 0)?.id ?? '';
         return {
             ...defaults,
             ...parsed,
@@ -141,6 +149,7 @@ export function loadProgress(): PlayerProgress {
             unlockedCharacters,
             ownedOutfits,
             equippedOutfit,
+            activePartner,
             completedEvents: thisStringArray(parsed.completedEvents, defaults.completedEvents),
             selectedChoices: parsed.selectedChoices && typeof parsed.selectedChoices === 'object'
                 ? parsed.selectedChoices
@@ -226,6 +235,10 @@ export function getEffectiveStats(progress: PlayerProgress): PlayerStats {
     (Object.keys(bonus) as PlayerStatKey[]).forEach((key) => {
         stats[key] = Math.min(5, stats[key] + Number(bonus[key] ?? 0));
     });
+    const partner = getPartnerSupport(progress.activePartner);
+    if (partner) {
+        stats[partner.stat] = Math.min(5, stats[partner.stat] + partner.statBonus);
+    }
     return stats;
 }
 
