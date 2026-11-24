@@ -1,6 +1,6 @@
 import { sys } from 'cc';
 import { ChoiceEffects, PlayerStatKey, StatRequirement } from './StoryData';
-import { DEFAULT_OUTFIT_ID } from './WardrobeData';
+import { DEFAULT_OUTFIT_ID, OUTFITS } from './WardrobeData';
 import { getPartnerSupport, PARTNERS } from './PartnerData';
 
 const SAVE_KEY = 'loverman.save.v1';
@@ -11,6 +11,8 @@ export type PlayerStats = Record<PlayerStatKey, number>;
 
 export interface PlayerProgress {
     version: 1;
+    playerName: string;
+    onboardingComplete: boolean;
     zodiac: string;
     personality: string;
     stats: PlayerStats;
@@ -23,6 +25,11 @@ export interface PlayerProgress {
     ownedOutfits: string[];
     equippedOutfit: string;
     activePartner: string;
+    challengeWins: number;
+    defeatedRivals: string[];
+    metCharacters: string[];
+    venueDiscoveries: string[];
+    capturedCharacters: string[];
     completedEvents: string[];
     selectedChoices: Record<string, string>;
 }
@@ -66,6 +73,8 @@ const PERSONALITY_BONUS: Record<string, PlayerStatKey> = {
 export function createDefaultProgress(): PlayerProgress {
     return {
         version: 1,
+        playerName: '',
+        onboardingComplete: false,
         zodiac: '',
         personality: '',
         stats: { ...BASE_STATS },
@@ -78,6 +87,11 @@ export function createDefaultProgress(): PlayerProgress {
         ownedOutfits: [DEFAULT_OUTFIT_ID],
         equippedOutfit: DEFAULT_OUTFIT_ID,
         activePartner: 'jiang-yanbai',
+        challengeWins: 0,
+        defeatedRivals: [],
+        metCharacters: [],
+        venueDiscoveries: [],
+        capturedCharacters: [],
         completedEvents: [],
         selectedChoices: {},
     };
@@ -114,6 +128,19 @@ export function loadProgress(): PlayerProgress {
     try {
         const parsed = JSON.parse(raw) as Partial<PlayerProgress>;
         const stats = parsed.stats ?? defaults.stats;
+        const hasLegacySetup = Boolean(
+            parsed.zodiac
+            && parsed.zodiac !== '未选择'
+            && parsed.personality
+            && parsed.personality !== '未选择',
+        );
+        const onboardingComplete = typeof parsed.onboardingComplete === 'boolean'
+            ? parsed.onboardingComplete
+            : hasLegacySetup;
+        const savedName = typeof parsed.playerName === 'string'
+            ? parsed.playerName.trim()
+            : '';
+        const playerName = savedName || (onboardingComplete ? '旅人' : '');
         const unlockedCharacters = thisStringArray(
             parsed.unlockedCharacters,
             defaults.unlockedCharacters,
@@ -135,6 +162,8 @@ export function loadProgress(): PlayerProgress {
             ...defaults,
             ...parsed,
             version: 1,
+            playerName,
+            onboardingComplete,
             stats: {
                 wisdom: thisNumber(stats.wisdom, defaults.stats.wisdom),
                 beauty: thisNumber(stats.beauty, defaults.stats.beauty),
@@ -150,6 +179,17 @@ export function loadProgress(): PlayerProgress {
             ownedOutfits,
             equippedOutfit,
             activePartner,
+            challengeWins: Math.max(0, thisNumber(parsed.challengeWins, defaults.challengeWins)),
+            defeatedRivals: thisStringArray(parsed.defeatedRivals, defaults.defeatedRivals),
+            metCharacters: thisStringArray(parsed.metCharacters, defaults.metCharacters),
+            venueDiscoveries: thisStringArray(
+                parsed.venueDiscoveries,
+                defaults.venueDiscoveries,
+            ),
+            capturedCharacters: thisStringArray(
+                parsed.capturedCharacters,
+                defaults.capturedCharacters,
+            ),
             completedEvents: thisStringArray(parsed.completedEvents, defaults.completedEvents),
             selectedChoices: parsed.selectedChoices && typeof parsed.selectedChoices === 'object'
                 ? parsed.selectedChoices
@@ -178,12 +218,24 @@ export function applyCustomization(
     progress: PlayerProgress,
     zodiac: string,
     personality: string,
+    playerName: string,
+    selectedOutfit: string,
 ): PlayerProgress {
+    const next = cloneProgress(progress);
+    const equippedOutfit = OUTFITS.some((outfit) => outfit.id === selectedOutfit)
+        ? selectedOutfit
+        : next.equippedOutfit;
+    if (next.ownedOutfits.indexOf(equippedOutfit) < 0) {
+        next.ownedOutfits.push(equippedOutfit);
+    }
     return {
-        ...cloneProgress(progress),
+        ...next,
+        playerName: playerName.trim().slice(0, 8),
+        onboardingComplete: true,
         zodiac,
         personality,
         stats: calculateStats(zodiac, personality),
+        equippedOutfit,
     };
 }
 
@@ -255,6 +307,42 @@ export function getBond(progress: PlayerProgress, characterId: string): number {
     return Number(progress.bonds[characterId] ?? 2);
 }
 
+export function meetCharacter(progress: PlayerProgress, characterId: string): PlayerProgress {
+    const next = cloneProgress(progress);
+    if (next.metCharacters.indexOf(characterId) >= 0) {
+        return next;
+    }
+    next.metCharacters.push(characterId);
+    if (next.unlockedCharacters.indexOf(characterId) < 0) {
+        next.unlockedCharacters.push(characterId);
+    }
+    next.bonds[characterId] = Math.max(3, getBond(next, characterId));
+    return next;
+}
+
+export function discoverVenueClue(progress: PlayerProgress, clueId: string): PlayerProgress {
+    const next = cloneProgress(progress);
+    if (next.venueDiscoveries.indexOf(clueId) < 0) {
+        next.venueDiscoveries.push(clueId);
+    }
+    return next;
+}
+
+export function captureCharacter(progress: PlayerProgress, characterId: string): PlayerProgress {
+    const next = cloneProgress(progress);
+    if (next.capturedCharacters.indexOf(characterId) >= 0) {
+        return next;
+    }
+    next.capturedCharacters.push(characterId);
+    if (next.unlockedCharacters.indexOf(characterId) < 0) {
+        next.unlockedCharacters.push(characterId);
+    }
+    next.bonds[characterId] = Math.min(6, getBond(next, characterId) + 1);
+    next.hearts = Math.min(6, next.hearts + 1);
+    next.coins += 30;
+    return next;
+}
+
 function cloneProgress(progress: PlayerProgress): PlayerProgress {
     return {
         ...progress,
@@ -263,6 +351,10 @@ function cloneProgress(progress: PlayerProgress): PlayerProgress {
         bonds: { ...progress.bonds },
         unlockedCharacters: [...progress.unlockedCharacters],
         ownedOutfits: [...progress.ownedOutfits],
+        defeatedRivals: [...progress.defeatedRivals],
+        metCharacters: [...progress.metCharacters],
+        venueDiscoveries: [...progress.venueDiscoveries],
+        capturedCharacters: [...progress.capturedCharacters],
         completedEvents: [...progress.completedEvents],
         selectedChoices: { ...progress.selectedChoices },
     };

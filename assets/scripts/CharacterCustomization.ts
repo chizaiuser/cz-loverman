@@ -3,6 +3,7 @@ import {
     Color,
     Component,
     director,
+    EditBox,
     Graphics,
     HorizontalTextAlignment,
     Label,
@@ -25,6 +26,7 @@ import {
 } from './GameProgress';
 import { PlayerStatKey } from './StoryData';
 import { gameFeel } from './GameFeel';
+import { getOutfit, OUTFITS } from './WardrobeData';
 
 const { ccclass } = _decorator;
 
@@ -109,24 +111,29 @@ export class CharacterCustomization extends Component {
     private toastNode: Node | null = null;
     private zodiacOptions = new Map<string, Node>();
     private personalityOptions = new Map<string, Node>();
+    private outfitOptions = new Map<string, Node>();
     private attributeViews = new Map<PlayerStatKey, AttributeView>();
     private previewStats: PlayerStats = calculateStats('', '');
+    private previewCharacter!: Node;
+    private outfitPreviewAccessory: Node | null = null;
+    private playerName = '';
+    private selectedOutfit = getOutfit('').id;
 
     protected start(): void {
         gameFeel.init();
         const saved = loadProgress();
-        if (
-            saved.zodiac
-            && saved.zodiac !== '未选择'
-            && saved.personality
-            && saved.personality !== '未选择'
-        ) {
-            director.loadScene('Main');
+        if (saved.onboardingComplete) {
+            director.loadScene('CityExplore');
             return;
         }
+        this.playerName = saved.playerName;
+        this.selectedZodiac = saved.zodiac;
+        this.selectedPersonality = saved.personality;
+        this.selectedOutfit = getOutfit(saved.equippedOutfit).id;
         this.createLayers();
         this.createBackground();
         this.createCharacter();
+        this.createOutfitSelection();
         this.createSelectionPanel();
         this.createAttributes();
         this.createActions();
@@ -178,7 +185,7 @@ export class CharacterCustomization extends Component {
         this.addLabel(
             this.backgroundLayer,
             'CustomizationTitle',
-            '形 象 定 制',
+            '创 建 你 的 角 色',
             40,
             new Color(116, 80, 132, 245),
             new Vec3(-178, 565),
@@ -189,7 +196,7 @@ export class CharacterCustomization extends Component {
         this.addLabel(
             this.backgroundLayer,
             'CustomizationSubtitle',
-            '让故事从你的选择开始',
+            '取好名字、选好装扮，再从街区开始故事',
             20,
             new Color(143, 105, 151, 220),
             new Vec3(-178, 520),
@@ -258,30 +265,164 @@ export class CharacterCustomization extends Component {
         pedestalGraphics.ellipse(0, 0, 260, 62);
         pedestalGraphics.stroke();
 
-        const character = this.createUiNode('CharacterPreview', this.characterLayer);
-        character.setPosition(-190, -30);
-        character.getComponent(UITransform)?.setContentSize(310, 620);
-        const sprite = character.addComponent(Sprite);
+        this.previewCharacter = this.createUiNode('CharacterPreview', this.characterLayer);
+        this.previewCharacter.setPosition(-190, -30);
+        this.previewCharacter.getComponent(UITransform)?.setContentSize(310, 620);
+        const sprite = this.previewCharacter.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         this.loadSprite(sprite, 'scene/layers/pink-girl/spriteFrame');
-        gameFeel.float(character, 4, 1.7);
-        this.makeInteractive(character, () => this.showModal(
+        this.refreshOutfitPreview();
+        gameFeel.float(this.previewCharacter, 4, 1.7);
+        this.makeInteractive(this.previewCharacter, () => this.showModal(
             '角色预览',
-            '粉衣女孩正在等待新的形象设定。\n\n选择星座和性格，让她带着专属于你的故事进入樱花之城。',
+            `${this.playerName || '这位女孩'}正在等待新的形象设定。\n\n`
+                + `当前服装：${getOutfit(this.selectedOutfit).name}\n`
+                + '完成名字、服装、星座和性格设置后，就可以进入樱花街区。',
             new Color(255, 133, 185, 255),
         ));
 
         this.addLabel(
             this.characterLayer,
             'PreviewHint',
-            '轻触角色查看预览',
+            '轻触角色查看当前装扮',
             18,
             new Color(137, 94, 143, 210),
-            new Vec3(-190, -382),
+            new Vec3(-190, -365),
             260,
             36,
             true,
         );
+    }
+
+    private createOutfitSelection(): void {
+        this.addLabel(
+            this.characterLayer,
+            'OutfitHeading',
+            '选择一套初始服装',
+            19,
+            new Color(122, 81, 133, 240),
+            new Vec3(-190, -407),
+            300,
+            34,
+            true,
+        );
+
+        const optionXs = [-315, -252, -189, -126, -63];
+        OUTFITS.forEach((outfit, index) => {
+            const option = this.createUiNode(`StartingOutfit_${outfit.id}`, this.characterLayer);
+            option.setPosition(optionXs[index], -468);
+            option.getComponent(UITransform)?.setContentSize(60, 72);
+            const graphics = option.addComponent(Graphics);
+            graphics.fillColor = new Color(255, 248, 252, 242);
+            graphics.strokeColor = outfit.accent;
+            graphics.lineWidth = 3;
+            graphics.roundRect(-30, -36, 60, 72, 16);
+            graphics.fill();
+            graphics.stroke();
+            graphics.fillColor = outfit.accent;
+            graphics.roundRect(-21, 9, 42, 22, 11);
+            graphics.fill();
+            this.addLabel(
+                option,
+                'OutfitName',
+                outfit.name,
+                11,
+                new Color(102, 68, 110, 255),
+                new Vec3(0, -19),
+                54,
+                34,
+                true,
+            );
+
+            const ring = this.createUiNode('SelectedRing', option);
+            ring.getComponent(UITransform)?.setContentSize(72, 84);
+            const ringGraphics = ring.addComponent(Graphics);
+            ringGraphics.strokeColor = new Color(255, 91, 166, 255);
+            ringGraphics.lineWidth = 5;
+            ringGraphics.roundRect(-36, -42, 72, 84, 19);
+            ringGraphics.stroke();
+            ring.active = outfit.id === this.selectedOutfit;
+
+            this.outfitOptions.set(outfit.id, option);
+            this.makeInteractive(option, () => {
+                this.selectedOutfit = outfit.id;
+                this.outfitOptions.forEach((node, id) => {
+                    const selectedRing = node.getChildByName('SelectedRing');
+                    if (selectedRing) {
+                        selectedRing.active = id === outfit.id;
+                    }
+                });
+                this.refreshOutfitPreview();
+                this.showToast(`初始服装：${outfit.name}`);
+            });
+        });
+    }
+
+    private refreshOutfitPreview(): void {
+        if (!this.previewCharacter?.isValid) {
+            return;
+        }
+        if (this.outfitPreviewAccessory?.isValid) {
+            this.outfitPreviewAccessory.destroy();
+        }
+        const accessory = this.createUiNode('PreviewOutfitAccessory', this.previewCharacter);
+        accessory.getComponent(UITransform)?.setContentSize(310, 620);
+        const graphics = accessory.addComponent(Graphics);
+        const outfit = getOutfit(this.selectedOutfit);
+
+        if (outfit.accessory === 'stars') {
+            graphics.fillColor = outfit.accent;
+            graphics.moveTo(-80, 244);
+            graphics.lineTo(-24, 287);
+            graphics.lineTo(18, 248);
+            graphics.lineTo(76, 270);
+            graphics.lineTo(25, 226);
+            graphics.close();
+            graphics.fill();
+            graphics.fillColor = new Color(255, 240, 164, 245);
+            graphics.circle(-52, 260, 8);
+            graphics.circle(44, 253, 7);
+            graphics.fill();
+        } else if (outfit.accessory === 'street') {
+            graphics.strokeColor = outfit.accent;
+            graphics.lineWidth = 13;
+            graphics.arc(0, 192, 84, 0, Math.PI, false);
+            graphics.stroke();
+            graphics.fillColor = outfit.accent;
+            graphics.roundRect(-99, 168, 30, 62, 14);
+            graphics.roundRect(69, 168, 30, 62, 14);
+            graphics.fill();
+        } else if (outfit.accessory === 'academy') {
+            graphics.fillColor = outfit.accent;
+            graphics.ellipse(49, 246, 78, 24);
+            graphics.fill();
+            graphics.roundRect(9, 235, 86, 24, 12);
+            graphics.fill();
+        } else if (outfit.accessory === 'flower') {
+            graphics.fillColor = outfit.accent;
+            graphics.circle(-84, 176, 16);
+            graphics.circle(-64, 187, 14);
+            graphics.circle(-62, 163, 13);
+            graphics.fill();
+            graphics.fillColor = new Color(255, 237, 172, 255);
+            graphics.circle(-73, 176, 7);
+            graphics.fill();
+        } else {
+            graphics.fillColor = outfit.accent;
+            for (let petal = 0; petal < 5; petal += 1) {
+                const angle = Math.PI * 2 * petal / 5;
+                graphics.circle(
+                    -82 + Math.cos(angle) * 14,
+                    188 + Math.sin(angle) * 14,
+                    10,
+                );
+            }
+            graphics.fill();
+            graphics.fillColor = new Color(255, 236, 171, 255);
+            graphics.circle(-82, 188, 7);
+            graphics.fill();
+        }
+        this.outfitPreviewAccessory = accessory;
     }
 
     private createSelectionPanel(): void {
@@ -296,13 +437,14 @@ export class CharacterCustomization extends Component {
         panelGraphics.fill();
         panelGraphics.stroke();
 
+        this.createNameField(panel);
         this.addLabel(
             panel,
             'ZodiacHeading',
             '选择星座',
             29,
             new Color(126, 82, 137, 255),
-            new Vec3(0, 445),
+            new Vec3(0, 380),
             300,
             54,
             true,
@@ -346,6 +488,90 @@ export class CharacterCustomization extends Component {
                 PANEL_X + columnX[index],
                 PANEL_Y - 36,
             );
+        });
+
+        this.zodiacOptions.forEach((node, name) => {
+            const ring = node.getChildByName('SelectedRing');
+            if (ring) {
+                ring.active = name === this.selectedZodiac;
+            }
+        });
+        this.personalityOptions.forEach((node, name) => {
+            const ring = node.getChildByName('SelectedRing');
+            if (ring) {
+                ring.active = name === this.selectedPersonality;
+            }
+        });
+    }
+
+    private createNameField(parent: Node): void {
+        const row = this.createUiNode('PlayerNameRow', parent);
+        row.setPosition(0, 447);
+        row.getComponent(UITransform)?.setContentSize(360, 66);
+        const rowGraphics = row.addComponent(Graphics);
+        rowGraphics.fillColor = new Color(255, 238, 248, 235);
+        rowGraphics.strokeColor = new Color(236, 190, 225, 220);
+        rowGraphics.lineWidth = 2;
+        rowGraphics.roundRect(-180, -33, 360, 66, 21);
+        rowGraphics.fill();
+        rowGraphics.stroke();
+
+        this.addLabel(
+            row,
+            'NameHeading',
+            '角色名',
+            20,
+            new Color(125, 82, 133, 255),
+            new Vec3(-121, 0),
+            88,
+            46,
+            true,
+        );
+
+        const inputNode = this.createUiNode('PlayerNameInput', row);
+        inputNode.setPosition(41, 0);
+        inputNode.getComponent(UITransform)?.setContentSize(226, 50);
+        const inputGraphics = inputNode.addComponent(Graphics);
+        inputGraphics.fillColor = new Color(255, 251, 254, 248);
+        inputGraphics.strokeColor = new Color(224, 178, 226, 235);
+        inputGraphics.lineWidth = 2;
+        inputGraphics.roundRect(-113, -25, 226, 50, 16);
+        inputGraphics.fill();
+        inputGraphics.stroke();
+
+        const textNode = this.createUiNode('TEXT_LABEL', inputNode);
+        textNode.getComponent(UITransform)?.setContentSize(198, 42);
+        const textLabel = textNode.addComponent(Label);
+        textLabel.fontSize = 21;
+        textLabel.lineHeight = 28;
+        textLabel.color = new Color(100, 65, 108, 255);
+        textLabel.horizontalAlign = HorizontalTextAlignment.LEFT;
+        textLabel.verticalAlign = VerticalTextAlignment.CENTER;
+        textLabel.overflow = Label.Overflow.SHRINK;
+
+        const placeholderNode = this.createUiNode('PLACEHOLDER_LABEL', inputNode);
+        placeholderNode.getComponent(UITransform)?.setContentSize(198, 42);
+        const placeholderLabel = placeholderNode.addComponent(Label);
+        placeholderLabel.fontSize = 18;
+        placeholderLabel.lineHeight = 26;
+        placeholderLabel.color = new Color(162, 128, 164, 220);
+        placeholderLabel.horizontalAlign = HorizontalTextAlignment.LEFT;
+        placeholderLabel.verticalAlign = VerticalTextAlignment.CENTER;
+        placeholderLabel.overflow = Label.Overflow.SHRINK;
+
+        const editBox = inputNode.addComponent(EditBox);
+        editBox.textLabel = textLabel;
+        editBox.placeholderLabel = placeholderLabel;
+        editBox.placeholder = '输入角色名';
+        editBox.string = this.playerName;
+        editBox.maxLength = 8;
+        editBox.inputMode = EditBox.InputMode.SINGLE_LINE;
+        editBox.returnType = EditBox.KeyboardReturnType.DONE;
+        inputNode.on(EditBox.EventType.TEXT_CHANGED, (box: EditBox) => {
+            this.playerName = box.string;
+        });
+        inputNode.on(EditBox.EventType.EDITING_DID_ENDED, (box: EditBox) => {
+            this.playerName = box.string.trim();
         });
     }
 
@@ -543,26 +769,13 @@ export class CharacterCustomization extends Component {
 
     private createActions(): void {
         this.createButton(
-            'DialogueButton',
-            '对话',
-            new Vec3(-215, -585),
-            245,
-            104,
-            new Color(255, 149, 192, 255),
-            () => this.showModal(
-                '初次对话',
-                '女孩：你觉得我该选哪个星座？\n\n你：选一个最像你的吧。\n\n女孩：那就等我们一起决定。',
-                new Color(255, 151, 187, 255),
-            ),
-        );
-        this.createButton(
             'ConfirmButton',
-            '确认，进入樱花之城',
-            new Vec3(155, -585),
-            390,
+            '确认形象，进入樱花街区',
+            new Vec3(0, -585),
+            440,
             104,
             new Color(190, 153, 255, 255),
-            () => this.confirmAndEnterMarket(),
+            () => this.confirmAndEnterCity(),
         );
     }
 
@@ -648,15 +861,30 @@ export class CharacterCustomization extends Component {
         this.toastNode = toast;
     }
 
-    private confirmAndEnterMarket(): void {
+    private confirmAndEnterCity(): void {
+        const playerName = this.playerName.trim();
+        if (!playerName) {
+            this.showToast('请先输入角色名字');
+            return;
+        }
+        if (!this.selectedOutfit) {
+            this.showToast('请选择一套初始服装');
+            return;
+        }
+        if (!this.selectedZodiac || !this.selectedPersonality) {
+            this.showToast('请选择星座和性格');
+            return;
+        }
         const progress = applyCustomization(
             loadProgress(),
             this.selectedZodiac,
             this.selectedPersonality,
+            playerName,
+            this.selectedOutfit,
         );
         saveProgress(progress);
         gameFeel.play('success');
-        director.loadScene('Main');
+        director.loadScene('CityExplore');
     }
 
     private showModal(title: string, message: string, accent: Color): void {

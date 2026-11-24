@@ -153,4 +153,5 @@
 | 8.jpg | `08-song-zhao.png` | 宋照 |
 | 9.jpg | `09-wen-xuechuan.png` | 闻雪川 |
 
-楚曜目前只有角色设定，没有对应原图，因此暂时没有立绘文件。
+楚曜的透明立绘已经补充为
+`assets/resources/characters/new-male-leads/10-chu-yao.png`，并加入图鉴与星屑剧场。

@@ -176,6 +176,126 @@ const CHARACTERS: CharacterEntry[] = [
         accent: new Color(126, 187, 230, 255),
         description: '气象摄影师，银发冒险家。他拍到一张照片，里面是你从未去过的地点和未来的自己。',
     },
+    {
+        id: 'chu-yao',
+        name: '楚曜',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/10-chu-yao/spriteFrame',
+        accent: new Color(211, 191, 236, 255),
+        description: '青年钢琴家，优雅却厌倦被包装成完美偶像。他匿名留下一段曲子，只等你听出真正的情绪。',
+    },
+    {
+        id: 'ji-xingran',
+        name: '季星燃',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/23-ji-xingran/spriteFrame',
+        accent: new Color(215, 105, 117, 255),
+        description: '爵士鼓手，舞台上永远精力充沛。散场后却会认真记住你随口说过的一首老歌。',
+    },
+    {
+        id: 'shen-yuheng',
+        name: '沈逾恒',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/11-shen-yuheng/spriteFrame',
+        accent: new Color(139, 180, 204, 255),
+        description: '骨科主治医生，理性克制，说话简短。他的值班表上总会为你留出一段不被工作占用的时间。',
+    },
+    {
+        id: 'shen-qinghe',
+        name: '沈清和',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/18-shen-qinghe/spriteFrame',
+        accent: new Color(143, 199, 202, 255),
+        description: '儿科医生，温和耐心。面对孩子总能找到最柔软的表达，面对喜欢的人却会紧张到忘记医嘱。',
+    },
+    {
+        id: 'wen-yu',
+        name: '温聿',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/20-wen-yu/spriteFrame',
+        accent: new Color(104, 161, 215, 255),
+        description: '深海医学家，习惯在极端环境里保持冷静。他说最危险的不是深海，而是无法说出口的喜欢。',
+    },
+    {
+        id: 'jing-mo',
+        name: '荆墨',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/12-jing-mo/spriteFrame',
+        accent: new Color(107, 96, 197, 255),
+        description: '地下赛车手，爱笑也爱冒险。比起稳赢的比赛，他更在意终点有没有等着自己的人。',
+    },
+    {
+        id: 'pei-yao',
+        name: '裴曜',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/16-pei-yao/spriteFrame',
+        accent: new Color(207, 102, 115, 255),
+        description: '职业赛车手，胜负欲强却尊重对手。他把最快的圈速留给自己，把副驾驶的位置留给你。',
+    },
+    {
+        id: 'su-yan',
+        name: '苏砚',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/13-su-yan/spriteFrame',
+        accent: new Color(139, 134, 177, 255),
+        description: '大学教授，成熟克制。课堂上从不迟到，唯独为了等你，会在旧书室多留一盏灯。',
+    },
+    {
+        id: 'jiang-xubai',
+        name: '江叙白',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/21-jiang-xubai/spriteFrame',
+        accent: new Color(145, 115, 87, 255),
+        description: '古籍修复师，安静专注。他能修好残缺的书页，也愿意慢慢补全两个人之间错过的故事。',
+    },
+    {
+        id: 'su-linyuan',
+        name: '苏临渊',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/22-su-linyuan/spriteFrame',
+        accent: new Color(175, 142, 104, 255),
+        description: '古董鉴定师，眼光锐利而从容。他说真正的珍品不靠年代证明，而看是否有人愿意一直珍藏。',
+    },
+    {
+        id: 'ye-ci',
+        name: '夜辞',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/14-ye-ci/spriteFrame',
+        accent: new Color(94, 91, 111, 255),
+        description: '秘密特工，行踪神秘。他擅长隐藏身份，却在每次任务结束后都会回到同一条樱花街。',
+    },
+    {
+        id: 'cang-lan',
+        name: '沧澜',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/15-cang-lan/spriteFrame',
+        accent: new Color(77, 165, 205, 255),
+        description: '深海学家，对未知世界充满好奇。他记录过无数深海生物，却第一次想认真记录一个人的笑容。',
+    },
+    {
+        id: 'xiao-tang',
+        name: '萧棠',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/17-xiao-tang/spriteFrame',
+        accent: new Color(116, 107, 105, 255),
+        description: '集团总裁，成熟果断。他习惯安排所有细节，却愿意把周末的决定权完整交给你。',
+    },
+    {
+        id: 'sha-luo',
+        name: '撒罗',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/19-sha-luo/spriteFrame',
+        accent: new Color(93, 130, 191, 255),
+        description: '科技新贵，聪明又有点孩子气。他能破解最复杂的程序，却猜不透一句晚安背后的心意。',
+    },
+    {
+        id: 'lu-shiyue',
+        name: '陆时玥',
+        bond: '2/6',
+        resource: 'characters/new-male-leads/24-lu-shiyue/spriteFrame',
+        accent: new Color(188, 161, 211, 255),
+        description: '私人调香师，银发冷淡。他为许多人调配气味，唯独为你保留了那瓶还没命名的香。',
+    },
 ];
 
 @ccclass('CharacterGallery')
@@ -341,7 +461,10 @@ export class CharacterGallery extends Component {
         this.pageRoot = this.createUiNode('GalleryPages', this.characterLayer);
         const columns = [-232, 0, 232];
         const rows = [305, 55, -195];
-        const pageEntries = [CHARACTERS.slice(0, 8), CHARACTERS.slice(8)];
+        const pageEntries: CharacterEntry[][] = [CHARACTERS.slice(0, 8)];
+        for (let index = 8; index < CHARACTERS.length; index += 9) {
+            pageEntries.push(CHARACTERS.slice(index, index + 9));
+        }
         pageEntries.forEach((entries, pageIndex) => {
             const page = this.createUiNode(`GalleryPage_${pageIndex + 1}`, this.pageRoot);
             page.setPosition(pageIndex * DESIGN_WIDTH, 0);
@@ -484,12 +607,31 @@ export class CharacterGallery extends Component {
             this.addLabel(
                 lock,
                 'LockHint',
-                '完成剧情解锁',
+                '前往工作场所相遇',
                 17,
                 new Color(255, 245, 251, 230),
                 new Vec3(0, -25),
                 170,
                 32,
+                true,
+            );
+        } else if (this.progress.capturedCharacters.indexOf(entry.id) >= 0) {
+            const captureBadge = this.createUiNode('CapturedBadge', card);
+            captureBadge.setPosition(-66, 99);
+            captureBadge.getComponent(UITransform)?.setContentSize(72, 28);
+            const captureGraphics = captureBadge.addComponent(Graphics);
+            captureGraphics.fillColor = new Color(246, 140, 178, 245);
+            captureGraphics.roundRect(-36, -14, 72, 28, 14);
+            captureGraphics.fill();
+            this.addLabel(
+                captureBadge,
+                'CapturedLabel',
+                '已俘获',
+                13,
+                Color.WHITE,
+                Vec3.ZERO,
+                66,
+                24,
                 true,
             );
         }
@@ -718,7 +860,8 @@ export class CharacterGallery extends Component {
         }
         this.showModal(
             entry.name,
-            `${entry.description}\n\n心动值：${getBond(this.progress, entry.id)}/6`,
+            `${entry.description}\n\n心动值：${getBond(this.progress, entry.id)}/6\n`
+                + `俘获状态：${this.progress.capturedCharacters.indexOf(entry.id) >= 0 ? '已俘获' : '尚未俘获'}`,
             entry.accent,
         );
     }

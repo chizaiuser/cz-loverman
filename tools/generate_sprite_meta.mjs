@@ -5,11 +5,13 @@ import { basename, extname, join } from 'node:path';
 
 const directory = process.argv[2];
 if (!directory) {
-    throw new Error('Usage: generate_sprite_meta.mjs <asset-directory>');
+    throw new Error('Usage: generate_sprite_meta.mjs <asset-directory> [file-pattern]');
 }
 
+const filePattern = process.argv[3] ? new RegExp(process.argv[3]) : null;
 const files = (await readdir(directory))
     .filter((file) => ['.png', '.jpg', '.webp'].includes(extname(file).toLowerCase()))
+    .filter((file) => !filePattern || filePattern.test(file))
     .sort();
 
 for (const file of files) {

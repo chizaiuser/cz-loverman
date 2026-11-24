@@ -22,6 +22,7 @@ import {
 } from 'cc';
 import { gameFeel } from './GameFeel';
 import {
+    getBond,
     loadProgress,
     PlayerProgress,
     saveProgress,
@@ -29,9 +30,15 @@ import {
 import { getOutfit, OUTFITS, OutfitDefinition } from './WardrobeData';
 import {
     getPartnerSupport,
+    getPartnerPortraitPath,
     PARTNERS,
     PartnerSupport,
 } from './PartnerData';
+import {
+    setActiveVenue,
+    VENUES,
+    VenueDefinition,
+} from './VenueData';
 
 const { ccclass } = _decorator;
 
@@ -100,6 +107,7 @@ export class CityExplore extends Component {
     private buildingLayer!: Node;
     private decorationLayer!: Node;
     private characterLayer!: Node;
+    private maleNpcLayer!: Node;
     private hudLayer!: Node;
     private feedbackLayer!: Node;
     private modalLayer!: Node;
@@ -111,7 +119,10 @@ export class CityExplore extends Component {
     private coinLabel!: Label;
     private jobPromptButton!: Node;
     private jobPromptLabel!: Label;
+    private venuePromptButton!: Node;
+    private venuePromptLabel!: Label;
     private currentJob: CityJob | null = null;
+    private currentVenue: VenueDefinition | null = null;
     private jobModal: Node | null = null;
     private jobTrack: Node | null = null;
     private jobMarker: Node | null = null;
@@ -130,6 +141,7 @@ export class CityExplore extends Component {
     private partnerButton!: Node;
     private partnerButtonLabel!: Label;
     private partnerModal: Node | null = null;
+    private maleDialogueModal: Node | null = null;
     private partnerList: Node | null = null;
     private partnerPageLabel: Label | null = null;
     private partnerActiveLabel: Label | null = null;
@@ -151,6 +163,10 @@ export class CityExplore extends Component {
 
     protected start(): void {
         this.progress = loadProgress();
+        if (!this.progress.onboardingComplete) {
+            director.loadScene('CharacterCustomization');
+            return;
+        }
         gameFeel.init();
         this.createLayers();
         this.createWorld();
@@ -174,6 +190,7 @@ export class CityExplore extends Component {
             this.jobModal?.isValid
             || this.wardrobeModal?.isValid
             || this.partnerModal?.isValid
+            || this.maleDialogueModal?.isValid
         ) {
             if (this.jobActive) {
                 this.updateJob(deltaTime);
@@ -181,6 +198,7 @@ export class CityExplore extends Component {
             return;
         }
         this.updateJobProximity();
+        this.updateVenueProximity();
 
         const keyboardX = (this.isPressed(KeyCode.KEY_D) || this.isPressed(KeyCode.ARROW_RIGHT) ? 1 : 0)
             - (this.isPressed(KeyCode.KEY_A) || this.isPressed(KeyCode.ARROW_LEFT) ? 1 : 0);
@@ -222,6 +240,7 @@ export class CityExplore extends Component {
         this.decorationLayer = this.createLayer('CityDecorationLayer', this.worldRoot);
         this.buildingLayer = this.createLayer('BuildingLayer', this.worldRoot);
         this.characterLayer = this.createLayer('CharacterLayer', this.worldRoot);
+        this.maleNpcLayer = this.createLayer('MaleNpcLayer', this.characterLayer);
         this.hudLayer = this.createLayer('HudLayer');
         this.feedbackLayer = this.createLayer('FeedbackLayer');
         this.modalLayer = this.createLayer('ModalLayer');
@@ -276,6 +295,7 @@ export class CityExplore extends Component {
         this.createFountain(0, 420);
         this.createTrees();
         this.createJobMarkers();
+        this.createVenueMarkers();
     }
 
     private createRoadDetails(): void {
@@ -301,9 +321,11 @@ export class CityExplore extends Component {
     private createBuildings(): void {
         const buildings = [
             { name: '花街咖啡馆', x: -610, y: 870, w: 350, h: 360, body: new Color(255, 205, 224), roof: new Color(190, 128, 170), sign: 'CAFE' },
-            { name: '樱花钟楼', x: 585, y: 850, w: 360, h: 430, body: new Color(245, 212, 242), roof: new Color(159, 126, 194), sign: 'CLOCK' },
+            { name: '星环创新中心', x: 585, y: 850, w: 360, h: 430, body: new Color(220, 228, 248), roof: new Color(132, 149, 205), sign: 'INNOVATE' },
             { name: '月光书室', x: -590, y: 360, w: 340, h: 310, body: new Color(230, 216, 250), roof: new Color(142, 124, 187), sign: 'BOOKS' },
             { name: '甜心商店', x: 590, y: 340, w: 340, h: 320, body: new Color(255, 218, 225), roof: new Color(204, 124, 159), sign: 'SWEET' },
+            { name: '仁心医院', x: -590, y: -170, w: 340, h: 250, body: new Color(220, 244, 241), roof: new Color(125, 179, 183), sign: 'CLINIC' },
+            { name: '夜轨赛车工坊', x: 590, y: -210, w: 340, h: 250, body: new Color(239, 219, 221), roof: new Color(144, 119, 130), sign: 'SPEED' },
             { name: '花语公寓', x: -600, y: -760, w: 350, h: 390, body: new Color(240, 211, 239), roof: new Color(162, 120, 180), sign: 'HOME' },
             { name: '星屑剧场', x: 590, y: -780, w: 350, h: 390, body: new Color(252, 214, 230), roof: new Color(194, 124, 171), sign: 'STAGE' },
         ];
@@ -492,6 +514,51 @@ export class CityExplore extends Component {
         }
     }
 
+    private createVenueMarkers(): void {
+        for (const venue of VENUES) {
+            const marker = this.createNode(`VenueEntrance_${venue.id}`, this.decorationLayer);
+            marker.setPosition(venue.entranceX, venue.entranceY);
+            marker.getComponent(UITransform)?.setContentSize(150, 110);
+            const graphics = marker.addComponent(Graphics);
+            graphics.fillColor = new Color(
+                venue.accent.r,
+                venue.accent.g,
+                venue.accent.b,
+                230,
+            );
+            graphics.strokeColor = new Color(255, 255, 255, 235);
+            graphics.lineWidth = 3;
+            graphics.roundRect(-55, -35, 110, 72, 22);
+            graphics.fill();
+            graphics.stroke();
+            graphics.fillColor = new Color(105, 73, 111, 235);
+            graphics.roundRect(-25, -29, 50, 48, 10);
+            graphics.fill();
+            this.addLabel(
+                marker,
+                'VenueIcon',
+                '开',
+                16,
+                Color.WHITE,
+                new Vec3(0, -5),
+                42,
+                30,
+                true,
+            );
+            this.addLabel(
+                marker,
+                'VenueName',
+                venue.name,
+                17,
+                new Color(101, 69, 108, 255),
+                new Vec3(0, -64),
+                190,
+                32,
+                true,
+            );
+        }
+    }
+
     private createPlayer(): void {
         this.player = this.createNode('Player', this.characterLayer);
         this.player.setPosition(0, -760);
@@ -531,6 +598,285 @@ export class CityExplore extends Component {
             .start();
     }
 
+    private createMaleNpcs(): void {
+        for (const child of [...this.maleNpcLayer.children]) {
+            child.destroy();
+        }
+        const partners = this.getUnlockedPartners().slice(0, 6);
+        const positions = [
+            new Vec3(-145, -565),
+            new Vec3(155, -610),
+            new Vec3(-145, -1010),
+            new Vec3(150, -1080),
+            new Vec3(365, -510),
+            new Vec3(-380, -520),
+        ];
+
+        partners.forEach((partner, index) => {
+            const npc = this.createNode(`MaleNpc_${partner.id}`, this.maleNpcLayer);
+            npc.setPosition(positions[index]);
+            npc.getComponent(UITransform)?.setContentSize(150, 190);
+
+            const shadow = this.createNode('NpcShadow', npc);
+            shadow.setPosition(0, -78);
+            shadow.getComponent(UITransform)?.setContentSize(96, 30);
+            const shadowGraphics = shadow.addComponent(Graphics);
+            shadowGraphics.fillColor = new Color(92, 65, 94, 80);
+            shadowGraphics.ellipse(0, 0, 48, 14);
+            shadowGraphics.fill();
+
+            const halo = this.createNode('NpcHalo', npc);
+            halo.setPosition(0, 2);
+            halo.getComponent(UITransform)?.setContentSize(126, 152);
+            const haloGraphics = halo.addComponent(Graphics);
+            haloGraphics.fillColor = new Color(
+                partner.accent.r,
+                partner.accent.g,
+                partner.accent.b,
+                60,
+            );
+            haloGraphics.roundRect(-60, -72, 120, 144, 35);
+            haloGraphics.fill();
+
+            const portrait = this.createNode('NpcPortrait', npc);
+            portrait.setPosition(0, 5);
+            portrait.getComponent(UITransform)?.setContentSize(104, 128);
+            const sprite = portrait.addComponent(Sprite);
+            sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+            resources.load(getPartnerPortraitPath(partner.id), SpriteFrame, (error, frame) => {
+                if (error || !frame) {
+                    gameFeel.showMissingImage(portrait, '角色');
+                    return;
+                }
+                if (sprite.isValid) {
+                    sprite.spriteFrame = frame;
+                }
+            });
+
+            const active = partner.id === this.progress.activePartner;
+            this.addLabel(
+                npc,
+                'NpcName',
+                `${partner.name}${active ? ' ★' : ''}`,
+                17,
+                new Color(94, 61, 102, 255),
+                new Vec3(0, 94),
+                145,
+                30,
+                true,
+            );
+            this.addLabel(
+                npc,
+                'NpcAction',
+                '点击对话',
+                14,
+                new Color(128, 87, 132, 225),
+                new Vec3(0, -92),
+                110,
+                24,
+                true,
+            );
+
+            this.makeInteractive(npc, () => this.openMaleDialogue(partner));
+        });
+    }
+
+    private openMaleDialogue(partner: PartnerSupport): void {
+        if (this.maleDialogueModal?.isValid) {
+            return;
+        }
+        this.jobPromptButton.active = false;
+        const modal = this.createNode('MaleDialogueModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(42, 27, 55, 178);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('MaleDialoguePanel', modal);
+        panel.setPosition(0, 10);
+        panel.getComponent(UITransform)?.setContentSize(670, 820);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 252, 252);
+        graphics.strokeColor = partner.accent;
+        graphics.lineWidth = 5;
+        graphics.roundRect(-335, -410, 670, 820, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = partner.accent;
+        graphics.roundRect(-128, 330, 256, 64, 32);
+        graphics.fill();
+
+        this.addLabel(
+            panel,
+            'DialogueTitle',
+            `与 ${partner.name} 对话`,
+            30,
+            Color.WHITE,
+            new Vec3(0, 362),
+            400,
+            56,
+            true,
+        );
+
+        const portraitCard = this.createNode('DialoguePortraitCard', panel);
+        portraitCard.setPosition(-195, 55);
+        portraitCard.getComponent(UITransform)?.setContentSize(230, 470);
+        const portraitGraphics = portraitCard.addComponent(Graphics);
+        portraitGraphics.fillColor = new Color(255, 235, 246, 230);
+        portraitGraphics.strokeColor = new Color(255, 255, 255, 225);
+        portraitGraphics.lineWidth = 3;
+        portraitGraphics.roundRect(-115, -235, 230, 470, 32);
+        portraitGraphics.fill();
+        portraitGraphics.stroke();
+
+        const portrait = this.createNode('DialoguePortrait', portraitCard);
+        portrait.setPosition(0, 28);
+        portrait.getComponent(UITransform)?.setContentSize(205, 250);
+        const sprite = portrait.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        resources.load(getPartnerPortraitPath(partner.id), SpriteFrame, (error, frame) => {
+            if (error || !frame) {
+                gameFeel.showMissingImage(portrait, '角色图片缺失');
+                return;
+            }
+            if (sprite.isValid) {
+                sprite.spriteFrame = frame;
+            }
+        });
+        this.addLabel(
+            portraitCard,
+            'DialogueRole',
+            partner.role,
+            19,
+            new Color(123, 80, 127, 255),
+            new Vec3(0, -132),
+            190,
+            32,
+            true,
+        );
+        this.addLabel(
+            portraitCard,
+            'DialogueBond',
+            `心动值 ${getBond(this.progress, partner.id)} / 6`,
+            17,
+            new Color(153, 103, 139, 235),
+            new Vec3(0, -174),
+            180,
+            30,
+            true,
+        );
+
+        this.addLabel(
+            panel,
+            'DialogueText',
+            this.getMaleDialogueText(partner),
+            23,
+            new Color(91, 59, 99, 255),
+            new Vec3(132, 91),
+            350,
+            300,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'DialogueSupport',
+            `${this.partnerSupportText(partner)}\n`
+                + (partner.id === this.progress.activePartner ? '当前支援搭档' : '可以设为支援搭档'),
+            17,
+            new Color(145, 101, 144, 235),
+            new Vec3(132, -107),
+            350,
+            72,
+            true,
+        );
+
+        if (partner.id !== this.progress.activePartner) {
+            this.createPanelButton(
+                panel,
+                'SetActivePartner',
+                '设为支援搭档',
+                new Vec3(-148, -312),
+                250,
+                64,
+                partner.accent,
+                () => {
+                    this.progress = {
+                        ...this.progress,
+                        activePartner: partner.id,
+                    };
+                    saveProgress(this.progress);
+                    this.updatePartnerButtonLabel();
+                    this.createMaleNpcs();
+                    this.closeMaleDialogue();
+                },
+            );
+        } else {
+            this.createPanelButton(
+                panel,
+                'ChallengeWithPartner',
+                '一起参加挑战',
+                new Vec3(-148, -312),
+                250,
+                64,
+                partner.accent,
+                () => director.loadScene('ChallengeArena'),
+            );
+        }
+        this.createPanelButton(
+            panel,
+            'CloseMaleDialogue',
+            '继续散步',
+            new Vec3(150, -312),
+            250,
+            64,
+            new Color(197, 174, 219, 255),
+            () => this.closeMaleDialogue(),
+        );
+
+        const previous = this.maleDialogueModal;
+        this.maleDialogueModal = modal;
+        if (previous?.isValid) {
+            previous.destroy();
+        }
+    }
+
+    private getMaleDialogueText(partner: PartnerSupport): string {
+        const dialogues: Record<string, string> = {
+            'shen-xinglan': '风里有一点甜味。我本来只是来等一份甜品，没想到先等到了你。',
+            'jiang-yanbai': '书室里那页旧地图提到了樱花街。你愿意陪我确认最后一个标记吗？',
+            'jiang-yanbai-hoodie': '我换了便装，还是被你一眼认出来了。看来今天适合一起走走。',
+            'xia-yang': '嘿！我刚从甜心商店出来。要不要一起找点更有趣的事做？',
+            'lu-qinglan': '今晚的舞台还缺一段即兴演出。如果你愿意，我可以把最好的位置留给你。',
+            'lu-qinglan-hoodie': '灯光还没亮，现在这条街只属于我们。想聊一会儿吗？',
+            'gu-chenzhou': '礼物重要的不是价格，而是送的人有没有认真记住对方。',
+            'liang-xingye': '这条街的空间比看上去复杂。跟着我，不会让你迷路。',
+            'tang-qi': '听见了吗？街角的鼓点刚好和你的脚步合拍。',
+            'xie-wujiu': '星象说今天会遇见一个改变计划的人。看来它就是现在。',
+            'pei-yuchuan': '不用急着决定方向。先告诉我，你今天最想做什么？',
+            'qi-guanlan': '我查到一条只在樱花街出现过的记录。也许你会对它感兴趣。',
+            'cheng-yanli': '橱窗里的蛋糕还热着。比起一个人吃完，我更想听你评价。',
+            'huo-wenzhou': '前面那段路刚修好，不过有我在，你走哪边都可以。',
+            'song-zhao': '观众还没来，舞台已经准备好了。你要不要先听我的开场？',
+            'wen-xuechuan': '刚才那个角度很好。如果你愿意，我想把今天的樱花街拍下来。',
+        };
+        return dialogues[partner.id]
+            ?? `${partner.name}在街角停下脚步，似乎正等着和${this.progress.playerName}说些什么。`;
+    }
+
+    private closeMaleDialogue(): void {
+        if (this.maleDialogueModal?.isValid) {
+            this.maleDialogueModal.destroy();
+        }
+        this.maleDialogueModal = null;
+        this.updateJobProximity();
+    }
+
     private createHud(): void {
         const topBar = this.createNode('CityTopBar', this.hudLayer);
         topBar.setPosition(0, 578);
@@ -557,7 +903,7 @@ export class CityExplore extends Component {
         this.locationLabel = this.addLabel(
             topBar,
             'LocationLabel',
-            '甜品住宅街',
+            `${this.progress.playerName} · 甜品住宅街`,
             17,
             new Color(153, 105, 151, 235),
             new Vec3(0, -22),
@@ -599,8 +945,28 @@ export class CityExplore extends Component {
             .getChildByName('ButtonLabel')!
             .getComponent(Label)!;
         this.updatePartnerButtonLabel();
+        this.createHudButton(
+            'ChallengeButton',
+            '女性挑战',
+            new Vec3(-285, 365),
+            160,
+            58,
+            () => director.loadScene('ChallengeArena'),
+        );
+        this.venuePromptButton = this.createHudButton(
+            'VenuePromptButton',
+            '进入场所',
+            new Vec3(225, -405),
+            270,
+            64,
+            () => this.openCurrentVenue(),
+        );
+        this.venuePromptLabel = this.venuePromptButton
+            .getChildByName('ButtonLabel')!
+            .getComponent(Label)!;
+        this.venuePromptButton.active = false;
 
-        this.createHudButton('CityBackButton', '返回市集', new Vec3(-285, 500), 124, 56, () => {
+        this.createHudButton('CityBackButton', '樱花市集', new Vec3(-285, 500), 124, 56, () => {
             director.loadScene('Main');
         });
         this.createHudButton('CityGalleryButton', '查看图鉴', new Vec3(285, 500), 124, 56, () => {
@@ -1168,7 +1534,7 @@ export class CityExplore extends Component {
             this.addLabel(
                 this.partnerList,
                 'NoPartners',
-                '还没有可支援的男性角色\n先完成剧情解锁图鉴角色',
+                '还没有可支援的男性角色\n先去工作场所探索并俘获角色',
                 21,
                 new Color(138, 99, 143, 230),
                 new Vec3(0, 50),
@@ -1317,6 +1683,7 @@ export class CityExplore extends Component {
             this.jobModal?.isValid
             || this.wardrobeModal?.isValid
             || this.partnerModal?.isValid
+            || this.maleDialogueModal?.isValid
         ) {
             this.jobPromptButton.active = false;
             return;
@@ -1338,6 +1705,46 @@ export class CityExplore extends Component {
         if (nearest && this.jobPromptLabel?.isValid) {
             this.jobPromptLabel.string = `${nearest.building}\n${nearest.action}`;
         }
+    }
+
+    private updateVenueProximity(): void {
+        if (!this.venuePromptButton?.isValid) {
+            return;
+        }
+        if (
+            this.jobModal?.isValid
+            || this.wardrobeModal?.isValid
+            || this.partnerModal?.isValid
+            || this.maleDialogueModal?.isValid
+        ) {
+            this.venuePromptButton.active = false;
+            return;
+        }
+
+        let nearest: VenueDefinition | null = null;
+        let nearestDistance = 160 * 160;
+        for (const venue of VENUES) {
+            const dx = this.player.position.x - venue.entranceX;
+            const dy = this.player.position.y - venue.entranceY;
+            const distance = dx * dx + dy * dy;
+            if (distance < nearestDistance) {
+                nearest = venue;
+                nearestDistance = distance;
+            }
+        }
+        this.currentVenue = nearest;
+        this.venuePromptButton.active = Boolean(nearest);
+        if (nearest && this.venuePromptLabel?.isValid) {
+            this.venuePromptLabel.string = `${nearest.name}\n进入探索`;
+        }
+    }
+
+    private openCurrentVenue(): void {
+        if (!this.currentVenue) {
+            return;
+        }
+        setActiveVenue(this.currentVenue.id);
+        director.loadScene('VenueInterior');
     }
 
     private openCurrentJob(): void {
@@ -1708,7 +2115,7 @@ export class CityExplore extends Component {
         }
         if (location !== this.lastLocation && this.locationLabel?.isValid) {
             this.lastLocation = location;
-            this.locationLabel.string = location;
+            this.locationLabel.string = `${this.progress.playerName} · ${location}`;
         }
     }
 

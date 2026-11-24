@@ -3,7 +3,8 @@
 使用 Cocos Creator 3.8.8 创建的微信小游戏项目。
 
 新增男性角色的职业、外形、性格与首章钩子见
-[docs/character-roster-10.md](docs/character-roster-10.md)。
+[docs/character-roster-10.md](docs/character-roster-10.md) 和
+[docs/character-roster-additional-15.md](docs/character-roster-additional-15.md)。
 
 尚未实现的功能和验证项见 [代办.md](代办.md)。
 
@@ -11,13 +12,13 @@
 
 1. 在 Cocos Dashboard 中选择“导入项目”。
 2. 选择本目录：`/Users/hik/Desktop/work/loverman`。
-3. 打开 `assets/scenes/Main.scene`，点击预览即可看到启动画面。
+3. 打开 `assets/scenes/CityExplore.scene`，点击预览即可看到街区首页。
 
 ## 发布微信小游戏
 
 1. 在 Cocos Creator 中打开“项目 > 构建发布”。
 2. 平台选择“微信小游戏”。
-3. 将 `Main` 场景设为启动场景。
+3. 将 `CityExplore` 场景设为启动场景；首次进入会先完成角色名称与装扮设置，已有存档会直接进入街区。
 4. 构建完成后，用微信开发者工具导入生成的 `build/wechatgame` 目录。
 
 项目使用 750 x 1334 的竖屏设计分辨率。
@@ -43,8 +44,8 @@ Canvas
 ```text
 Canvas
 ├─ BackgroundLayer       渐变和樱花装饰
-├─ CharacterLayer        角色预览和底座
-├─ SelectionLayer        星座、性格及各自选中框
+├─ CharacterLayer        角色预览、初始服装和底座
+├─ SelectionLayer        角色名、星座、性格及选中框
 ├─ AttributeLayer        属性条
 ├─ ActionLayer           对话、确认
 ├─ FeedbackLayer         选择提示
@@ -67,13 +68,38 @@ Canvas
 ```text
 Canvas
 ├─ CityDecorationLayer   道路、人行道、喷泉、树木
-├─ BuildingLayer         商店、住宅、钟楼及碰撞区域
+├─ BuildingLayer         商店、工作场所、住宅、钟楼及碰撞区域
 ├─ CharacterLayer        可移动主角
-├─ HudLayer              标题、位置、返回按钮和虚拟摇杆
+├─ HudLayer              玩家名、位置、金币、场所入口和虚拟摇杆
 └─ FeedbackLayer         场景过渡
 ```
 
-街区使用俯视 2D 布局。手机端拖动左下角摇杆移动，桌面端支持 WASD 和方向键；镜头跟随主角，建筑与喷泉会阻挡移动。从市集点击“进入街区”即可打开。
+工作场所场景：
+
+```text
+Canvas
+├─ BackgroundLayer       按场所变化的墙面、地板和光线
+├─ VenueDecorationLayer  咖啡台、甜品柜、舞台或书架
+├─ CharacterLayer        该场所工作的男性角色
+├─ HudLayer              场所名、探索进度、魅力值和返回按钮
+├─ FeedbackLayer         调查和任务提示
+└─ ModalLayer            线索详情、角色对话和俘获结算
+```
+
+女性挑战场景：
+
+```text
+Canvas
+├─ BackgroundLayer       粉色舞台、光束和地面
+├─ ArenaLayer            对手选择、双方面板、三轮题目和结算
+├─ HudLayer              标题、金币、返回按钮
+├─ FeedbackLayer         未解锁与切换搭档提示
+└─ ModalLayer            后续挑战专属弹窗预留
+```
+
+街区现在是游戏首页，使用俯视 2D 布局。手机端拖动左下角摇杆移动，桌面端支持 WASD 和方向键；镜头跟随主角，建筑与喷泉会阻挡移动。31 名男性角色分别在城市中的咖啡馆、甜点店、星屑剧场、月光书室、仁心医院、夜轨赛车工坊和星环创新中心工作。靠近工作场所入口后点击“进入探索”。
+
+每个工作场所包含三处调查点。完成全部调查会完成该场所的委托；与男性角色对话会完成初次相遇并解锁图鉴。完成探索、好感达到 3、魅力达到 4 后，可以在角色对话面板中俘获角色。俘获会提升好感与收集进度、奖励 30 金币，并让角色加入图鉴和搭档列表。
 
 街区包含三处兼职点：花街咖啡馆、甜心商店和星屑剧场。靠近兼职点后点击右下角按钮，进入三轮时机判定；指针越接近高亮区域，获得的金币越多。金币保存在 `loverman.save.v1`，会显示在街区 HUD 和市集线索簿中。
 
@@ -81,15 +107,36 @@ Canvas
 
 街区 HUD 的“搭档”可以从已解锁男性角色中选择支援搭档。搭档提供一项有效属性加成，并为指定兼职增加金币收入；当前搭档会持久化，后续女性角色挑战可以直接复用这套支援数据。
 
+街区 HUD 的“女性挑战”会进入三轮评分挑战。当前有苏蔓和纪岚两名对手；苏蔓偏好甜美与优雅，纪岚偏好冷艳与街头，击败苏蔓后解锁纪岚。
+
+挑战流程：
+
+```text
+选择对手 → 穿搭主题评分 → 线索问答
+→ 切换并确认男性搭档 → 三局总分结算
+→ 首胜/重复奖励 → 纪岚解锁或返回街区
+```
+
+穿搭轮按主题标签与美貌评分，线索轮按回答、才智、洞察和已收集线索评分，搭档轮按搭档主属性和兼职联动评分。首胜奖励较高，重复胜利只给少量金币，避免无限刷挑战成为唯一经济来源。胜场和已击败对手会写入 `loverman.save.v1`。
+
 分层图片位于 `assets/resources/scene/layers`。原始的两张 JPG 只保留作素材来源，运行时不再加载整张成品界面。
 
-图鉴角色素材位于 `assets/resources/scene/gallery`。市集页左上角的“图鉴”按钮会进入 `CharacterGallery` 场景。
+图鉴角色素材位于 `assets/resources/scene/gallery` 和 `assets/resources/characters/new-male-leads`。街区 HUD 的“查看图鉴”按钮会进入 `CharacterGallery` 场景，图鉴已经扩展为 32 名角色、4 页，支持左右滑动；已俘获角色会显示“已俘获”标记。
 
 `tools/extract_foreground.swift` 使用 macOS Vision 的显著性检测从原始 JPG 中提取透明人物，便于后续重新生成角色素材。
 
 ## 当前玩法闭环
 
-角色数据、线索、礼物、好感和剧情进度统一保存在 `loverman.save.v1`。首次进入需要完成形象定制，后续启动会直接继续到市集。
+角色数据、线索、礼物、好感和剧情进度统一保存在 `loverman.save.v1`。首次进入需要编辑玩家名称、初始服装、星座和性格，确认后直接进入街区；后续启动会直接进入街区。
+
+当前主循环：
+
+```text
+进入工作场所 → 调查三处线索
+→ 与男性角色对话 → 完成场所任务
+→ 提升好感和魅力 → 俘获角色
+→ 解锁图鉴与搭档 → 兼职、换装和女性挑战
+```
 
 第一章流程：
 
