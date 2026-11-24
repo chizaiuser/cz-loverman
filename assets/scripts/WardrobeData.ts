@@ -1,4 +1,5 @@
 import { Color } from 'cc';
+import { OUTFIT_PRICES } from './EconomyData';
 
 export interface OutfitDefinition {
     id: string;
@@ -27,7 +28,7 @@ export const OUTFITS: OutfitDefinition[] = [
     {
         id: 'mint-florist',
         name: '薄荷花艺',
-        price: 80,
+        price: OUTFIT_PRICES['mint-florist'],
         tags: ['温柔', '自然'],
         description: '薄荷色围巾与小花胸针，适合花店兼职和温柔系对话。',
         bonusLabel: '洞察 +1',
@@ -37,7 +38,7 @@ export const OUTFITS: OutfitDefinition[] = [
     {
         id: 'starlight-gown',
         name: '星夜礼服',
-        price: 150,
+        price: OUTFIT_PRICES['starlight-gown'],
         tags: ['优雅', '冷艳'],
         description: '深紫礼服配星轨发饰，适合舞台和正式挑战。',
         bonusLabel: '美貌 +1',
@@ -47,7 +48,7 @@ export const OUTFITS: OutfitDefinition[] = [
     {
         id: 'street-pop',
         name: '活力街头',
-        price: 120,
+        price: OUTFIT_PRICES['street-pop'],
         tags: ['活泼', '街头'],
         description: '青色耳机和短夹克，适合电竞、运动与节奏挑战。',
         bonusLabel: '洞察 +1',
@@ -57,7 +58,7 @@ export const OUTFITS: OutfitDefinition[] = [
     {
         id: 'academy-retro',
         name: '复古学院',
-        price: 180,
+        price: OUTFIT_PRICES['academy-retro'],
         tags: ['复古', '知性'],
         description: '酒红贝雷帽与格纹围巾，适合档案室和推理挑战。',
         bonusLabel: '才智 +1',

@@ -2,6 +2,9 @@ import { sys } from 'cc';
 import { ChoiceEffects, PlayerStatKey, StatRequirement } from './StoryData';
 import { DEFAULT_OUTFIT_ID, OUTFITS } from './WardrobeData';
 import { getPartnerSupport, PARTNERS } from './PartnerData';
+import { SKILLS } from './TaskData';
+import { COSMETICS, SURGERIES } from './BeautyData';
+import { ECONOMY } from './EconomyData';
 
 const SAVE_KEY = 'loverman.save.v1';
 const LEGACY_ZODIAC_KEY = 'loverman.zodiac';
@@ -30,6 +33,13 @@ export interface PlayerProgress {
     metCharacters: string[];
     venueDiscoveries: string[];
     capturedCharacters: string[];
+    gatheredFlowers: string[];
+    jobIncomeEarned: number;
+    jobRuns: Record<string, number>;
+    learnedSkills: string[];
+    claimedTaskRewards: string[];
+    purchasedCosmetics: string[];
+    surgeryLevel: number;
     completedEvents: string[];
     selectedChoices: Record<string, string>;
 }
@@ -79,7 +89,7 @@ export function createDefaultProgress(): PlayerProgress {
         personality: '',
         stats: { ...BASE_STATS },
         clues: [],
-        coins: 0,
+        coins: ECONOMY.startingCoins,
         gifts: 1,
         hearts: 3,
         bonds: {},
@@ -92,6 +102,13 @@ export function createDefaultProgress(): PlayerProgress {
         metCharacters: [],
         venueDiscoveries: [],
         capturedCharacters: [],
+        gatheredFlowers: [],
+        jobIncomeEarned: 0,
+        jobRuns: {},
+        learnedSkills: [],
+        claimedTaskRewards: [],
+        purchasedCosmetics: [],
+        surgeryLevel: 0,
         completedEvents: [],
         selectedChoices: {},
     };
@@ -137,6 +154,15 @@ export function loadProgress(): PlayerProgress {
         const onboardingComplete = typeof parsed.onboardingComplete === 'boolean'
             ? parsed.onboardingComplete
             : hasLegacySetup;
+        const jobRuns: Record<string, number> = {};
+        if (parsed.jobRuns && typeof parsed.jobRuns === 'object') {
+            Object.keys(parsed.jobRuns).forEach((key) => {
+                const value = parsed.jobRuns?.[key];
+                if (typeof value === 'number' && Number.isFinite(value)) {
+                    jobRuns[key] = Math.max(0, value);
+                }
+            });
+        }
         const savedName = typeof parsed.playerName === 'string'
             ? parsed.playerName.trim()
             : '';
@@ -189,6 +215,31 @@ export function loadProgress(): PlayerProgress {
             capturedCharacters: thisStringArray(
                 parsed.capturedCharacters,
                 defaults.capturedCharacters,
+            ),
+            gatheredFlowers: thisStringArray(
+                parsed.gatheredFlowers,
+                defaults.gatheredFlowers,
+            ),
+            jobIncomeEarned: Math.max(
+                0,
+                thisNumber(parsed.jobIncomeEarned, defaults.jobIncomeEarned),
+            ),
+            jobRuns,
+            learnedSkills: thisStringArray(parsed.learnedSkills, defaults.learnedSkills),
+            claimedTaskRewards: thisStringArray(
+                parsed.claimedTaskRewards,
+                defaults.claimedTaskRewards,
+            ),
+            purchasedCosmetics: thisStringArray(
+                parsed.purchasedCosmetics,
+                defaults.purchasedCosmetics,
+            ),
+            surgeryLevel: Math.max(
+                0,
+                Math.min(
+                    SURGERIES.length,
+                    thisNumber(parsed.surgeryLevel, defaults.surgeryLevel),
+                ),
             ),
             completedEvents: thisStringArray(parsed.completedEvents, defaults.completedEvents),
             selectedChoices: parsed.selectedChoices && typeof parsed.selectedChoices === 'object'
@@ -291,6 +342,12 @@ export function getEffectiveStats(progress: PlayerProgress): PlayerStats {
     if (partner) {
         stats[partner.stat] = Math.min(5, stats[partner.stat] + partner.statBonus);
     }
+    for (const skillId of progress.learnedSkills) {
+        const skill = SKILLS.find((entry) => entry.id === skillId);
+        if (skill) {
+            stats[skill.stat] = Math.min(5, stats[skill.stat] + skill.statBonus);
+        }
+    }
     return stats;
 }
 
@@ -339,8 +396,43 @@ export function captureCharacter(progress: PlayerProgress, characterId: string):
     }
     next.bonds[characterId] = Math.min(6, getBond(next, characterId) + 1);
     next.hearts = Math.min(6, next.hearts + 1);
-    next.coins += 30;
+    next.coins += ECONOMY.captureRewardCoins;
     return next;
+}
+
+export function collectFlower(progress: PlayerProgress, flowerId: string): PlayerProgress {
+    const next = cloneProgress(progress);
+    if (next.gatheredFlowers.indexOf(flowerId) < 0) {
+        next.gatheredFlowers.push(flowerId);
+    }
+    return next;
+}
+
+export interface CharmBreakdown {
+    base: number;
+    cosmetics: number;
+    surgery: number;
+    total: number;
+}
+
+export function getCharmBreakdown(progress: PlayerProgress): CharmBreakdown {
+    const base = getEffectiveStats(progress).beauty;
+    const cosmetics = COSMETICS
+        .filter((item) => progress.purchasedCosmetics.indexOf(item.id) >= 0)
+        .reduce((sum, item) => sum + item.charmBonus, 0);
+    const surgery = SURGERIES
+        .filter((item) => item.level <= progress.surgeryLevel)
+        .reduce((sum, item) => sum + item.charmBonus, 0);
+    return {
+        base,
+        cosmetics,
+        surgery,
+        total: Math.min(10, base + cosmetics + surgery),
+    };
+}
+
+export function getCharmValue(progress: PlayerProgress): number {
+    return getCharmBreakdown(progress).total;
 }
 
 function cloneProgress(progress: PlayerProgress): PlayerProgress {
@@ -355,6 +447,11 @@ function cloneProgress(progress: PlayerProgress): PlayerProgress {
         metCharacters: [...progress.metCharacters],
         venueDiscoveries: [...progress.venueDiscoveries],
         capturedCharacters: [...progress.capturedCharacters],
+        gatheredFlowers: [...progress.gatheredFlowers],
+        learnedSkills: [...progress.learnedSkills],
+        claimedTaskRewards: [...progress.claimedTaskRewards],
+        purchasedCosmetics: [...progress.purchasedCosmetics],
+        jobRuns: { ...progress.jobRuns },
         completedEvents: [...progress.completedEvents],
         selectedChoices: { ...progress.selectedChoices },
     };

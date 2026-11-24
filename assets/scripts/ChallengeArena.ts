@@ -31,6 +31,7 @@ import {
     PARTNERS,
     PartnerSupport,
 } from './PartnerData';
+import { CHALLENGE_REWARDS } from './EconomyData';
 
 const { ccclass } = _decorator;
 
@@ -80,8 +81,8 @@ const RIVALS: RivalDefinition[] = [
         themeTags: ['甜美', '优雅'],
         quote: '好看只是入场券，搭配里有没有你自己的故事，才决定能不能留下来。',
         unlockAfter: '',
-        firstReward: 100,
-        repeatReward: 25,
+        firstReward: CHALLENGE_REWARDS['su-man'].first,
+        repeatReward: CHALLENGE_REWARDS['su-man'].repeat,
         roundScores: [165, 150, 145],
         accent: new Color(241, 137, 178, 255),
         hair: new Color(126, 76, 93, 255),
@@ -104,8 +105,8 @@ const RIVALS: RivalDefinition[] = [
         themeTags: ['冷艳', '街头'],
         quote: '别急着看观众。先看清脚下的线，再决定下一步站在哪里。',
         unlockAfter: 'su-man',
-        firstReward: 150,
-        repeatReward: 35,
+        firstReward: CHALLENGE_REWARDS['ji-lan'].first,
+        repeatReward: CHALLENGE_REWARDS['ji-lan'].repeat,
         roundScores: [165, 160, 145],
         accent: new Color(126, 154, 224, 255),
         hair: new Color(54, 58, 82, 255),

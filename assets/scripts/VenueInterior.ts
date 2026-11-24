@@ -21,6 +21,7 @@ import {
     captureCharacter,
     discoverVenueClue,
     getBond,
+    getCharmBreakdown,
     getEffectiveStats,
     loadProgress,
     meetCharacter,
@@ -34,6 +35,8 @@ import {
     VenueDefinition,
     VenueExplorationPoint,
 } from './VenueData';
+import { SURGERIES, SurgeryDefinition } from './BeautyData';
+import { getCharacterLore } from './CharacterLoreData';
 
 const { ccclass } = _decorator;
 
@@ -55,6 +58,9 @@ export class VenueInterior extends Component {
     private explorationLabel!: Label;
     private charmLabel!: Label;
     private dialogueModal: Node | null = null;
+    private surgeryModal: Node | null = null;
+    private surgeryContent: Node | null = null;
+    private surgeryCharmLabel: Label | null = null;
     private infoModal: Node | null = null;
     private toastNode: Node | null = null;
     private actionLocked = false;
@@ -704,10 +710,22 @@ export class VenueInterior extends Component {
         this.charmLabel = this.addPillLabel(
             new Vec3(270, 493),
             130,
-            `魅力 ${getEffectiveStats(this.progress).beauty}`,
+            `魅力 ${getCharmBreakdown(this.progress).total}`,
             new Color(255, 239, 186, 240),
             new Color(230, 177, 102, 255),
         );
+        if (this.venue.id === 'hospital') {
+            this.createButton(
+                this.hudLayer,
+                'OpenMedicalBeauty',
+                '医疗美容中心',
+                new Vec3(0, 405),
+                230,
+                54,
+                new Color(129, 190, 189, 255),
+                () => this.openSurgeryPanel(),
+            );
+        }
 
         this.addLabel(
             this.hudLayer,
@@ -757,8 +775,205 @@ export class VenueInterior extends Component {
             this.explorationLabel.string = `探索 ${this.getVenueDiscoveryCount()} / ${this.venue.exploration.length}`;
         }
         if (this.charmLabel?.isValid) {
-            this.charmLabel.string = `魅力 ${getEffectiveStats(this.progress).beauty}`;
+            this.charmLabel.string = `魅力 ${getCharmBreakdown(this.progress).total}`;
         }
+    }
+
+    private openSurgeryPanel(): void {
+        if (this.surgeryModal?.isValid) {
+            return;
+        }
+        const modal = this.createNode('SurgeryModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(34, 27, 52, 188);
+        shade.rect(-375, -667, 750, 1334);
+        shade.fill();
+
+        const panel = this.createNode('SurgeryPanel', modal);
+        panel.getComponent(UITransform)?.setContentSize(700, 850);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(247, 252, 252, 252);
+        graphics.strokeColor = new Color(127, 190, 189, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-350, -425, 700, 850, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(127, 190, 189, 255);
+        graphics.roundRect(-135, 350, 270, 64, 32);
+        graphics.fill();
+        this.addLabel(
+            panel,
+            'SurgeryTitle',
+            '医 疗 美 容 中 心',
+            29,
+            Color.WHITE,
+            new Vec3(0, 382),
+            500,
+            56,
+            true,
+        );
+        this.surgeryCharmLabel = this.addLabel(
+            panel,
+            'SurgeryCharm',
+            '',
+            21,
+            new Color(77, 117, 119, 255),
+            new Vec3(0, 305),
+            580,
+            40,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'SurgeryHint',
+            '医疗美容按阶段解锁，效果永久生效并计入俘获魅力',
+            17,
+            new Color(112, 142, 144, 235),
+            new Vec3(0, 268),
+            600,
+            34,
+            true,
+        );
+        this.surgeryContent = this.createNode('SurgeryContent', panel);
+        this.surgeryContent.setPosition(0, -5);
+        this.surgeryContent.getComponent(UITransform)?.setContentSize(650, 540);
+        this.createButton(
+            panel,
+            'CloseSurgery',
+            '离开美容中心',
+            new Vec3(0, -360),
+            250,
+            56,
+            new Color(177, 202, 210, 255),
+            () => this.closeSurgeryPanel(),
+        );
+        this.surgeryModal = modal;
+        this.renderSurgeryContent();
+    }
+
+    private renderSurgeryContent(): void {
+        if (!this.surgeryContent?.isValid) {
+            return;
+        }
+        for (const child of [...this.surgeryContent.children]) {
+            child.destroy();
+        }
+        const charm = getCharmBreakdown(this.progress);
+        if (this.surgeryCharmLabel?.isValid) {
+            this.surgeryCharmLabel.string = `当前魅力 ${charm.total}`
+                + `（基础 ${charm.base} + 美妆 ${charm.cosmetics} + 医美 ${charm.surgery}）`;
+        }
+        const positions = [170, -20, -210];
+        SURGERIES.forEach((surgery, index) => {
+            this.createSurgeryCard(surgery, positions[index]);
+        });
+    }
+
+    private createSurgeryCard(surgery: SurgeryDefinition, y: number): void {
+        if (!this.surgeryContent?.isValid) {
+            return;
+        }
+        const done = this.progress.surgeryLevel >= surgery.level;
+        const available = this.progress.surgeryLevel === surgery.level - 1;
+        const card = this.createNode(`Surgery_${surgery.level}`, this.surgeryContent);
+        card.setPosition(0, y);
+        card.getComponent(UITransform)?.setContentSize(620, 168);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = done
+            ? new Color(surgery.accent.r, surgery.accent.g, surgery.accent.b, 72)
+            : new Color(255, 255, 255, 240);
+        graphics.strokeColor = done || available
+            ? surgery.accent
+            : new Color(205, 213, 218, 235);
+        graphics.lineWidth = done || available ? 4 : 2;
+        graphics.roundRect(-310, -84, 620, 168, 26);
+        graphics.fill();
+        graphics.stroke();
+        this.addLabel(
+            card,
+            'SurgeryName',
+            `${surgery.level}. ${surgery.name}`,
+            23,
+            new Color(65, 91, 98, 255),
+            new Vec3(-112, 50),
+            350,
+            34,
+            true,
+        );
+        this.addLabel(
+            card,
+            'SurgeryDescription',
+            surgery.description,
+            16,
+            new Color(103, 124, 129, 235),
+            new Vec3(-112, 8),
+            390,
+            48,
+            true,
+        );
+        this.addLabel(
+            card,
+            'SurgeryBonus',
+            `魅力永久 +${surgery.charmBonus} · ${surgery.price} 金币`,
+            16,
+            surgery.accent,
+            new Vec3(-112, -48),
+            360,
+            28,
+            true,
+        );
+        this.createButton(
+            card,
+            'SurgeryAction',
+            done ? '已完成' : available ? '进行手术' : '尚未解锁',
+            new Vec3(227, 0),
+            140,
+            56,
+            done ? new Color(174, 190, 193, 255) : available
+                ? surgery.accent
+                : new Color(190, 199, 204, 255),
+            () => this.buySurgery(surgery),
+        );
+    }
+
+    private buySurgery(surgery: SurgeryDefinition): void {
+        if (this.progress.surgeryLevel >= surgery.level) {
+            this.showToast('这一阶段的医疗美容已经完成');
+            return;
+        }
+        if (this.progress.surgeryLevel !== surgery.level - 1) {
+            this.showToast('请先完成上一阶段医疗美容');
+            return;
+        }
+        if (this.progress.coins < surgery.price) {
+            this.showToast(`金币不足，还需要 ${surgery.price - this.progress.coins}`);
+            return;
+        }
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins - surgery.price,
+            surgeryLevel: surgery.level,
+        };
+        saveProgress(this.progress);
+        this.updateHudProgress();
+        this.renderSurgeryContent();
+        gameFeel.play('success');
+        this.showToast(`${surgery.name}完成：魅力永久 +${surgery.charmBonus}`);
+    }
+
+    private closeSurgeryPanel(): void {
+        if (this.surgeryModal?.isValid) {
+            this.surgeryModal.destroy();
+        }
+        this.surgeryModal = null;
+        this.surgeryContent = null;
+        this.surgeryCharmLabel = null;
     }
 
     private openCharacterDialogue(partner: PartnerSupport): void {
@@ -774,7 +989,7 @@ export class VenueInterior extends Component {
         }
 
         const bond = getBond(this.progress, partner.id);
-        const charm = getEffectiveStats(this.progress).beauty;
+        const charm = getCharmBreakdown(this.progress).total;
         const found = this.getVenueDiscoveryCount();
         const captured = this.progress.capturedCharacters.indexOf(partner.id) >= 0;
         const ready = this.isCaptureReady(partner);
@@ -855,6 +1070,16 @@ export class VenueInterior extends Component {
             32,
             true,
         );
+        this.createButton(
+            portraitCard,
+            'OpenCharacterProfile',
+            '查看完整档案',
+            new Vec3(0, -176),
+            190,
+            36,
+            partner.accent,
+            () => this.showCharacterProfile(partner),
+        );
 
         this.addLabel(
             panel,
@@ -898,7 +1123,7 @@ export class VenueInterior extends Component {
                 ? '你已经俘获了他，可以继续邀请他约会或参加挑战。'
                 : ready
                     ? '所有条件已满足，他正在等待你的回应。'
-                    : '完成探索、提升好感并穿戴魅力足够的服装后再来。',
+                    : '完成探索，并通过服装、化妆品、技能或医疗美容提升魅力后再来。',
             16,
             captured || ready ? partner.accent : new Color(147, 109, 151, 235),
             new Vec3(140, -80),
@@ -940,6 +1165,27 @@ export class VenueInterior extends Component {
         this.dialogueModal = modal;
     }
 
+    private showCharacterProfile(partner: PartnerSupport): void {
+        const lore = getCharacterLore(partner.id);
+        if (!lore) {
+            this.showInfoModal(
+                `${partner.name} · 角色档案`,
+                `${partner.role}\n\n暂时还没有更详细的档案。`,
+                partner.accent,
+            );
+            return;
+        }
+        this.showInfoModal(
+            `${partner.name} · 角色档案`,
+            `年龄 ${lore.age} · ${lore.job}\n\n`
+                + `性格：${lore.personality}\n\n`
+                + `偏好：${lore.preference}\n\n`
+                + `关系：${lore.relationship}\n\n`
+                + `故事钩子：${lore.hook}`,
+            partner.accent,
+        );
+    }
+
     private giveGift(partner: PartnerSupport): void {
         if (this.progress.gifts <= 0) {
             this.showToast('礼物不足，可以先去街区兼职或完成线索任务');
@@ -970,7 +1216,7 @@ export class VenueInterior extends Component {
             return;
         }
         if (!this.isCaptureReady(partner)) {
-            const charm = getEffectiveStats(this.progress).beauty;
+            const charm = getCharmBreakdown(this.progress).total;
             const bond = getBond(this.progress, partner.id);
             const found = this.getVenueDiscoveryCount();
             this.showToast(
@@ -999,7 +1245,7 @@ export class VenueInterior extends Component {
     private isCaptureReady(partner: PartnerSupport): boolean {
         return this.getVenueDiscoveryCount() >= this.venue.exploration.length
             && getBond(this.progress, partner.id) >= this.venue.captureBond
-            && getEffectiveStats(this.progress).beauty >= this.venue.captureCharm;
+            && getCharmBreakdown(this.progress).total >= this.venue.captureCharm;
     }
 
     private getVenueDiscoveryCount(): number {
@@ -1117,7 +1363,9 @@ export class VenueInterior extends Component {
         if (this.toastNode?.isValid) {
             this.toastNode.destroy();
         }
-        const toastParent = this.dialogueModal?.isValid ? this.modalLayer : this.feedbackLayer;
+        const toastParent = this.dialogueModal?.isValid || this.surgeryModal?.isValid
+            ? this.modalLayer
+            : this.feedbackLayer;
         const toast = this.createNode('VenueToast', toastParent);
         toast.setPosition(0, 397);
         toast.getComponent(UITransform)?.setContentSize(520, 58);

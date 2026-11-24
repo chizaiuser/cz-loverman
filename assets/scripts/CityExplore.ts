@@ -17,12 +17,15 @@ import {
     SpriteFrame,
     tween,
     UITransform,
+    UIOpacity,
     Vec3,
     VerticalTextAlignment,
 } from 'cc';
 import { gameFeel } from './GameFeel';
 import {
+    collectFlower,
     getBond,
+    getCharmBreakdown,
     loadProgress,
     PlayerProgress,
     saveProgress,
@@ -35,10 +38,22 @@ import {
     PartnerSupport,
 } from './PartnerData';
 import {
+    getPartnerVenueId,
     setActiveVenue,
     VENUES,
     VenueDefinition,
 } from './VenueData';
+import {
+    SKILLS,
+    ROLE_TASKS,
+    RoleTaskDefinition,
+    RoleTaskRequirement,
+    SkillDefinition,
+    TASKS,
+    TaskDefinition,
+} from './TaskData';
+import { COSMETICS, CosmeticDefinition } from './BeautyData';
+import { ECONOMY, JOB_REWARDS } from './EconomyData';
 
 const { ccclass } = _decorator;
 
@@ -68,6 +83,15 @@ interface CityJob {
     accent: Color;
 }
 
+interface FlowerSpot {
+    id: string;
+    x: number;
+    y: number;
+    accent: Color;
+}
+
+type TaskView = 'jobs' | 'roles';
+
 const CITY_JOBS: CityJob[] = [
     {
         id: 'cafe',
@@ -75,8 +99,8 @@ const CITY_JOBS: CityJob[] = [
         action: '冲煮咖啡',
         x: -610,
         y: 640,
-        baseReward: 12,
-        bonusReward: 15,
+        baseReward: JOB_REWARDS.cafe.base,
+        bonusReward: JOB_REWARDS.cafe.bonus,
         accent: new Color(238, 150, 190, 255),
     },
     {
@@ -85,8 +109,8 @@ const CITY_JOBS: CityJob[] = [
         action: '装饰蛋糕',
         x: 590,
         y: 130,
-        baseReward: 15,
-        bonusReward: 18,
+        baseReward: JOB_REWARDS.sweet.base,
+        bonusReward: JOB_REWARDS.sweet.bonus,
         accent: new Color(246, 170, 132, 255),
     },
     {
@@ -95,10 +119,19 @@ const CITY_JOBS: CityJob[] = [
         action: '整理舞台',
         x: 590,
         y: -1005,
-        baseReward: 18,
-        bonusReward: 22,
+        baseReward: JOB_REWARDS.stage.base,
+        bonusReward: JOB_REWARDS.stage.bonus,
         accent: new Color(186, 143, 229, 255),
     },
+];
+
+const FLOWER_SPOTS: FlowerSpot[] = [
+    { id: 'flower-1', x: -150, y: 1180, accent: new Color(255, 149, 195, 255) },
+    { id: 'flower-2', x: 155, y: 930, accent: new Color(247, 172, 214, 255) },
+    { id: 'flower-3', x: -155, y: 500, accent: new Color(222, 174, 242, 255) },
+    { id: 'flower-4', x: 150, y: 120, accent: new Color(255, 191, 208, 255) },
+    { id: 'flower-5', x: -150, y: -260, accent: new Color(242, 156, 204, 255) },
+    { id: 'flower-6', x: 150, y: -1180, accent: new Color(213, 177, 240, 255) },
 ];
 
 @ccclass('CityExplore')
@@ -140,7 +173,17 @@ export class CityExplore extends Component {
     private wardrobePreviewCaption: Label | null = null;
     private partnerButton!: Node;
     private partnerButtonLabel!: Label;
+    private taskButtonLabel!: Label;
+    private charmLabel!: Label;
     private partnerModal: Node | null = null;
+    private taskModal: Node | null = null;
+    private taskContent: Node | null = null;
+    private taskMessageLabel: Label | null = null;
+    private taskView: TaskView = 'jobs';
+    private roleTaskPage = 0;
+    private beautyModal: Node | null = null;
+    private beautyContent: Node | null = null;
+    private beautyCharmLabel: Label | null = null;
     private maleDialogueModal: Node | null = null;
     private partnerList: Node | null = null;
     private partnerPageLabel: Label | null = null;
@@ -190,6 +233,8 @@ export class CityExplore extends Component {
             this.jobModal?.isValid
             || this.wardrobeModal?.isValid
             || this.partnerModal?.isValid
+            || this.taskModal?.isValid
+            || this.beautyModal?.isValid
             || this.maleDialogueModal?.isValid
         ) {
             if (this.jobActive) {
@@ -296,6 +341,7 @@ export class CityExplore extends Component {
         this.createTrees();
         this.createJobMarkers();
         this.createVenueMarkers();
+        this.createFlowerPickups();
     }
 
     private createRoadDetails(): void {
@@ -557,6 +603,76 @@ export class CityExplore extends Component {
                 true,
             );
         }
+    }
+
+    private createFlowerPickups(): void {
+        for (const flower of FLOWER_SPOTS) {
+            if (this.progress.gatheredFlowers.indexOf(flower.id) >= 0) {
+                continue;
+            }
+            const node = this.createNode(`FlowerPickup_${flower.id}`, this.decorationLayer);
+            node.setPosition(flower.x, flower.y);
+            node.getComponent(UITransform)?.setContentSize(90, 104);
+            const graphics = node.addComponent(Graphics);
+            graphics.fillColor = new Color(255, 234, 246, 175);
+            graphics.circle(0, 12, 35);
+            graphics.fill();
+            graphics.fillColor = flower.accent;
+            for (let petal = 0; petal < 6; petal += 1) {
+                const angle = Math.PI * 2 * petal / 6;
+                graphics.circle(
+                    Math.cos(angle) * 20,
+                    26 + Math.sin(angle) * 20,
+                    11,
+                );
+            }
+            graphics.fill();
+            graphics.fillColor = new Color(255, 225, 139, 255);
+            graphics.circle(0, 26, 8);
+            graphics.fill();
+            graphics.strokeColor = new Color(111, 169, 132, 230);
+            graphics.lineWidth = 3;
+            graphics.moveTo(0, 15);
+            graphics.lineTo(0, -18);
+            graphics.stroke();
+            this.addLabel(
+                node,
+                'FlowerLabel',
+                '采集花朵',
+                15,
+                new Color(116, 74, 117, 255),
+                new Vec3(0, -37),
+                100,
+                26,
+                true,
+            );
+            this.makeInteractive(node, () => this.pickFlower(flower, node));
+        }
+    }
+
+    private pickFlower(flower: FlowerSpot, node: Node): void {
+        if (this.progress.gatheredFlowers.indexOf(flower.id) >= 0) {
+            return;
+        }
+        this.progress = collectFlower(this.progress, flower.id);
+        saveProgress(this.progress);
+        gameFeel.play('success');
+        this.updateTaskButtonLabel();
+        const collected = this.progress.gatheredFlowers.length;
+        const flowerTask = TASKS.find((task) => task.metric === 'flowers');
+        if (flowerTask && collected >= flowerTask.target) {
+            this.showCityToast('采集任务已完成，可以在任务列表领取奖励');
+        } else {
+            this.showCityToast(`采集到一朵花 · ${collected} / ${flowerTask?.target ?? 3}`);
+        }
+        tween(node)
+            .to(0.18, { scale: new Vec3(1.35, 1.35, 1) })
+            .call(() => {
+                if (node.isValid) {
+                    node.destroy();
+                }
+            })
+            .start();
     }
 
     private createPlayer(): void {
@@ -933,6 +1049,27 @@ export class CityExplore extends Component {
             38,
             true,
         );
+        const charmPill = this.createNode('CharmPill', this.hudLayer);
+        charmPill.setPosition(0, 435);
+        charmPill.getComponent(UITransform)?.setContentSize(170, 44);
+        const charmGraphics = charmPill.addComponent(Graphics);
+        charmGraphics.fillColor = new Color(255, 224, 240, 238);
+        charmGraphics.strokeColor = new Color(232, 145, 188, 235);
+        charmGraphics.lineWidth = 2;
+        charmGraphics.roundRect(-85, -22, 170, 44, 22);
+        charmGraphics.fill();
+        charmGraphics.stroke();
+        this.charmLabel = this.addLabel(
+            charmPill,
+            'CharmLabel',
+            '魅力 0',
+            19,
+            new Color(142, 73, 108, 255),
+            Vec3.ZERO,
+            152,
+            38,
+            true,
+        );
         this.partnerButton = this.createHudButton(
             'PartnerButton',
             '搭档',
@@ -953,6 +1090,18 @@ export class CityExplore extends Component {
             58,
             () => director.loadScene('ChallengeArena'),
         );
+        const taskButton = this.createHudButton(
+            'TaskButton',
+            '兼职任务',
+            new Vec3(0, 365),
+            160,
+            58,
+            () => this.openTaskPanel(),
+        );
+        this.taskButtonLabel = taskButton
+            .getChildByName('ButtonLabel')!
+            .getComponent(Label)!;
+        this.updateTaskButtonLabel();
         this.venuePromptButton = this.createHudButton(
             'VenuePromptButton',
             '进入场所',
@@ -965,6 +1114,15 @@ export class CityExplore extends Component {
             .getChildByName('ButtonLabel')!
             .getComponent(Label)!;
         this.venuePromptButton.active = false;
+        this.createHudButton(
+            'BeautyButton',
+            '美妆店',
+            new Vec3(-285, -345),
+            170,
+            64,
+            () => this.openBeautyStudio(),
+        );
+        this.updateCharmLabel();
 
         this.createHudButton('CityBackButton', '樱花市集', new Vec3(-285, 500), 124, 56, () => {
             director.loadScene('Main');
@@ -1086,6 +1244,937 @@ export class CityExplore extends Component {
         this.joystickBase.on(Node.EventType.TOUCH_MOVE, updateJoystick);
         this.joystickBase.on(Node.EventType.TOUCH_END, resetJoystick);
         this.joystickBase.on(Node.EventType.TOUCH_CANCEL, resetJoystick);
+    }
+
+    private openTaskPanel(): void {
+        if (this.taskModal?.isValid) {
+            return;
+        }
+        this.taskView = 'jobs';
+        this.roleTaskPage = 0;
+        this.jobPromptButton.active = false;
+        this.venuePromptButton.active = false;
+        const modal = this.createNode('TaskModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(42, 27, 57, 178);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('TaskPanel', modal);
+        panel.setPosition(0, 0);
+        panel.getComponent(UITransform)?.setContentSize(700, 1120);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 252, 252);
+        graphics.strokeColor = new Color(218, 159, 222, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-350, -560, 700, 1120, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(212, 149, 219, 255);
+        graphics.roundRect(-118, 470, 236, 64, 32);
+        graphics.fill();
+
+        this.addLabel(
+            panel,
+            'TaskTitle',
+            '兼 职 任 务',
+            32,
+            Color.WHITE,
+            new Vec3(0, 502),
+            340,
+            56,
+            true,
+        );
+        this.createPanelButton(
+            panel,
+            'JobTaskTab',
+            '兼职任务',
+            new Vec3(-92, 430),
+            170,
+            44,
+            new Color(222, 161, 209, 255),
+            () => this.switchTaskView('jobs'),
+        );
+        this.createPanelButton(
+            panel,
+            'RoleTaskTab',
+            '角色委托',
+            new Vec3(92, 430),
+            170,
+            44,
+            new Color(164, 150, 225, 255),
+            () => this.switchTaskView('roles'),
+        );
+
+        this.taskContent = this.createNode('TaskContent', panel);
+        this.taskContent.setPosition(0, 40);
+        this.taskContent.getComponent(UITransform)?.setContentSize(650, 790);
+        this.taskMessageLabel = this.addLabel(
+            panel,
+            'TaskMessage',
+            `当前金币 ${this.progress.coins} · 任务和技能会保存到本机`,
+            17,
+            new Color(132, 94, 140, 235),
+            new Vec3(0, -428),
+            610,
+            42,
+            true,
+        );
+        this.createPanelButton(
+            panel,
+            'CloseTaskPanel',
+            '关闭任务',
+            new Vec3(0, -505),
+            230,
+            54,
+            new Color(196, 167, 219, 255),
+            () => this.closeTaskPanel(),
+        );
+        this.taskModal = modal;
+        this.renderTaskPanel();
+    }
+
+    private renderTaskPanel(): void {
+        if (!this.taskContent?.isValid) {
+            return;
+        }
+        for (const child of [...this.taskContent.children]) {
+            child.destroy();
+        }
+
+        if (this.taskView === 'roles') {
+            this.renderRoleTasks();
+            this.updateTaskButtonLabel();
+            return;
+        }
+
+        const taskYs = [270, 100, -70];
+        TASKS.forEach((task, index) => {
+            this.createTaskCard(task, taskYs[index]);
+        });
+
+        this.addLabel(
+            this.taskContent,
+            'SkillHeading',
+            '技能学习 · 学会后永久提升属性',
+            21,
+            new Color(111, 73, 119, 255),
+            new Vec3(0, -178),
+            590,
+            36,
+            true,
+        );
+        const skillXs = [-210, 0, 210];
+        SKILLS.forEach((skill, index) => {
+            this.createSkillCard(skill, skillXs[index]);
+        });
+        this.updateTaskButtonLabel();
+    }
+
+    private switchTaskView(view: TaskView): void {
+        this.taskView = view;
+        this.roleTaskPage = 0;
+        this.renderTaskPanel();
+        this.showTaskMessage(
+            view === 'jobs'
+                ? '兼职任务：采集、收入和技能学习'
+                : '角色委托：完成角色故事、提升好感和获取额外羁绊',
+        );
+    }
+
+    private renderRoleTasks(): void {
+        if (!this.taskContent?.isValid) {
+            return;
+        }
+        const pageSize = 3;
+        const totalPages = Math.max(1, Math.ceil(ROLE_TASKS.length / pageSize));
+        this.roleTaskPage = Math.max(0, Math.min(totalPages - 1, this.roleTaskPage));
+        const tasks = ROLE_TASKS.slice(
+            this.roleTaskPage * pageSize,
+            this.roleTaskPage * pageSize + pageSize,
+        );
+        const taskYs = [250, 75, -100];
+        tasks.forEach((task, index) => {
+            this.createRoleTaskCard(task, taskYs[index]);
+        });
+
+        this.createPanelButton(
+            this.taskContent,
+            'PreviousRoleTaskPage',
+            '‹',
+            new Vec3(-225, -285),
+            62,
+            48,
+            new Color(191, 167, 219, 255),
+            () => {
+                this.roleTaskPage = Math.max(0, this.roleTaskPage - 1);
+                this.renderTaskPanel();
+            },
+        );
+        this.addLabel(
+            this.taskContent,
+            'RoleTaskPageLabel',
+            `${this.roleTaskPage + 1} / ${totalPages}　共 ${ROLE_TASKS.length} 个角色委托`,
+            17,
+            new Color(126, 91, 139, 235),
+            new Vec3(0, -285),
+            320,
+            34,
+            true,
+        );
+        this.createPanelButton(
+            this.taskContent,
+            'NextRoleTaskPage',
+            '›',
+            new Vec3(225, -285),
+            62,
+            48,
+            new Color(191, 167, 219, 255),
+            () => {
+                const maxPage = Math.max(0, Math.ceil(ROLE_TASKS.length / pageSize) - 1);
+                this.roleTaskPage = Math.min(maxPage, this.roleTaskPage + 1);
+                this.renderTaskPanel();
+            },
+        );
+    }
+
+    private createTaskCard(task: TaskDefinition, y: number): void {
+        if (!this.taskContent?.isValid) {
+            return;
+        }
+        const progress = this.getTaskProgress(task);
+        const complete = progress >= task.target;
+        const claimed = this.progress.claimedTaskRewards.indexOf(task.id) >= 0;
+        const card = this.createNode(`Task_${task.id}`, this.taskContent);
+        card.setPosition(0, y);
+        card.getComponent(UITransform)?.setContentSize(640, 150);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = claimed
+            ? new Color(241, 235, 243, 230)
+            : new Color(255, 250, 253, 240);
+        graphics.strokeColor = complete && !claimed ? task.accent : new Color(236, 214, 237, 230);
+        graphics.lineWidth = complete && !claimed ? 4 : 2;
+        graphics.roundRect(-320, -75, 640, 150, 25);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(task.accent.r, task.accent.g, task.accent.b, 50);
+        graphics.roundRect(-312, -67, 624, 134, 20);
+        graphics.fill();
+
+        this.addLabel(
+            card,
+            'TaskName',
+            task.title,
+            23,
+            new Color(94, 59, 103, 255),
+            new Vec3(-126, 43),
+            310,
+            34,
+            true,
+        );
+        this.addLabel(
+            card,
+            'TaskDescription',
+            task.description,
+            16,
+            new Color(125, 85, 126, 235),
+            new Vec3(-132, 3),
+            390,
+            50,
+            true,
+        );
+        this.addLabel(
+            card,
+            'TaskProgress',
+            `${Math.min(progress, task.target)} / ${task.target}`
+                + `　奖励 ${task.rewardCoins} 金币 + ${task.rewardGifts} 礼物`,
+            16,
+            new Color(149, 103, 128, 240),
+            new Vec3(-125, -48),
+            390,
+            30,
+            true,
+        );
+
+        const buttonText = claimed
+            ? '已领取'
+            : complete
+                ? '领取奖励'
+                : task.metric === 'flowers'
+                    ? '去采集'
+                    : task.metric === 'jobIncome'
+                        ? '去兼职'
+                        : '学习技能';
+        this.createPanelButton(
+            card,
+            'TaskAction',
+            buttonText,
+            new Vec3(225, -3),
+            150,
+            58,
+            claimed ? new Color(184, 171, 192, 255) : task.accent,
+            () => this.handleTaskAction(task),
+        );
+    }
+
+    private createRoleTaskCard(task: RoleTaskDefinition, y: number): void {
+        if (!this.taskContent?.isValid) {
+            return;
+        }
+        const character = getPartnerSupport(task.characterId);
+        const claimed = this.progress.claimedTaskRewards.indexOf(task.id) >= 0;
+        const prerequisiteReady = !task.prerequisiteTaskId
+            || this.progress.claimedTaskRewards.indexOf(task.prerequisiteTaskId) >= 0;
+        const met = this.progress.metCharacters.indexOf(task.characterId) >= 0;
+        const ready = this.isRoleTaskReady(task);
+        const card = this.createNode(`RoleTask_${task.id}`, this.taskContent);
+        card.setPosition(0, y);
+        card.getComponent(UITransform)?.setContentSize(640, 155);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = claimed
+            ? new Color(241, 235, 243, 230)
+            : new Color(255, 250, 253, 242);
+        graphics.strokeColor = ready && !claimed ? task.accent : new Color(233, 214, 238, 230);
+        graphics.lineWidth = ready && !claimed ? 4 : 2;
+        graphics.roundRect(-320, -77, 640, 155, 25);
+        graphics.fill();
+        graphics.stroke();
+
+        this.addLabel(
+            card,
+            'RoleTaskTitle',
+            `${task.title} · ${character?.name ?? '角色'}`,
+            21,
+            new Color(93, 58, 102, 255),
+            new Vec3(-110, 50),
+            370,
+            34,
+            true,
+        );
+        this.addLabel(
+            card,
+            'RoleTaskReward',
+            `${task.rewardCoins} 金币 · ${task.rewardGifts} 礼物`,
+            15,
+            new Color(142, 99, 132, 235),
+            new Vec3(170, 50),
+            210,
+            28,
+            true,
+        );
+        this.addLabel(
+            card,
+            'RoleTaskDescription',
+            task.description,
+            15,
+            new Color(126, 87, 130, 235),
+            new Vec3(-108, 17),
+            410,
+            38,
+            true,
+        );
+        const requirementText = task.requirements.map((requirement) => {
+            const status = this.getRoleRequirementStatus(requirement);
+            return `${status.met ? '✓' : '○'} ${status.text}`;
+        }).join('  ');
+        const prerequisiteText = task.prerequisiteTaskId && !prerequisiteReady
+            ? '○ 请先完成上一阶段委托\n'
+            : '';
+        this.addLabel(
+            card,
+            'RoleTaskRequirements',
+            prerequisiteText + requirementText,
+            13,
+            ready && !claimed ? task.accent : new Color(143, 105, 146, 235),
+            new Vec3(-132, -43),
+            420,
+            54,
+            true,
+        );
+
+        const buttonText = claimed
+            ? '已完成'
+            : !met
+                ? '先去相遇'
+                : !prerequisiteReady
+                    ? '前置未完成'
+                    : ready
+                        ? '领取奖励'
+                        : '继续任务';
+        this.createPanelButton(
+            card,
+            'RoleTaskAction',
+            buttonText,
+            new Vec3(225, -43),
+            145,
+            48,
+            claimed ? new Color(180, 169, 190, 255) : task.accent,
+            () => this.handleRoleTaskAction(task),
+        );
+    }
+
+    private getRoleRequirementStatus(requirement: RoleTaskRequirement): {
+        met: boolean;
+        text: string;
+    } {
+        if (requirement.kind === 'met-character') {
+            const met = this.progress.metCharacters.indexOf(requirement.characterId) >= 0;
+            return {
+                met,
+                text: requirement.label,
+            };
+        }
+        if (requirement.kind === 'bond') {
+            const bond = getBond(this.progress, requirement.characterId);
+            return {
+                met: bond >= requirement.target,
+                text: `好感 ${bond}/${requirement.target}`,
+            };
+        }
+        if (requirement.kind === 'venue-complete') {
+            const venue = VENUES.find((entry) => entry.id === requirement.venueId);
+            const found = venue
+                ? venue.exploration.filter((point) => (
+                    this.progress.venueDiscoveries.indexOf(point.id) >= 0
+                )).length
+                : 0;
+            const target = venue?.exploration.length ?? 3;
+            return {
+                met: found >= target,
+                text: `场所探索 ${found}/${target}`,
+            };
+        }
+        if (requirement.kind === 'learned-skill') {
+            const learned = requirement.skillId
+                ? this.progress.learnedSkills.indexOf(requirement.skillId) >= 0
+                : this.progress.learnedSkills.length >= requirement.target;
+            return {
+                met: learned,
+                text: requirement.label,
+            };
+        }
+        if (requirement.kind === 'flowers') {
+            return {
+                met: this.progress.gatheredFlowers.length >= requirement.target,
+                text: `采集花朵 ${Math.min(this.progress.gatheredFlowers.length, requirement.target)}/${requirement.target}`,
+            };
+        }
+        return {
+            met: this.progress.jobIncomeEarned >= requirement.target,
+            text: `兼职收入 ${Math.min(this.progress.jobIncomeEarned, requirement.target)}/${requirement.target}`,
+        };
+    }
+
+    private isRoleTaskReady(task: RoleTaskDefinition): boolean {
+        const prerequisiteReady = !task.prerequisiteTaskId
+            || this.progress.claimedTaskRewards.indexOf(task.prerequisiteTaskId) >= 0;
+        return prerequisiteReady
+            && task.requirements.every((requirement) => this.getRoleRequirementStatus(requirement).met);
+    }
+
+    private handleRoleTaskAction(task: RoleTaskDefinition): void {
+        if (this.progress.claimedTaskRewards.indexOf(task.id) >= 0) {
+            this.showTaskMessage('这项角色委托已经完成并领取');
+            return;
+        }
+        if (
+            task.prerequisiteTaskId
+            && this.progress.claimedTaskRewards.indexOf(task.prerequisiteTaskId) < 0
+        ) {
+            this.showTaskMessage('请先完成上一阶段角色委托');
+            return;
+        }
+        if (this.progress.metCharacters.indexOf(task.characterId) < 0) {
+            const venue = VENUES.find((entry) => entry.id === getPartnerVenueId(task.characterId));
+            this.closeTaskPanel();
+            this.showCityToast(`先去${venue?.name ?? '工作场所'}找到他并完成初次对话`);
+            return;
+        }
+        if (!this.isRoleTaskReady(task)) {
+            const missing = task.requirements
+                .map((requirement) => this.getRoleRequirementStatus(requirement))
+                .filter((status) => !status.met)
+                .map((status) => status.text);
+            this.showTaskMessage(`还差：${missing.join('、')}`);
+            return;
+        }
+
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins + task.rewardCoins,
+            gifts: this.progress.gifts + task.rewardGifts,
+            bonds: {
+                ...this.progress.bonds,
+                [task.characterId]: Math.min(
+                    6,
+                    getBond(this.progress, task.characterId) + task.rewardBond,
+                ),
+            },
+            claimedTaskRewards: [...this.progress.claimedTaskRewards, task.id],
+        };
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        this.updateTaskButtonLabel();
+        gameFeel.play('success');
+        this.renderTaskPanel();
+        const character = getPartnerSupport(task.characterId);
+        this.showTaskMessage(
+            `${task.title}完成：${character?.name ?? '角色'}好感 +${task.rewardBond}，`
+                + `获得 ${task.rewardCoins} 金币`,
+        );
+    }
+
+    private createSkillCard(skill: SkillDefinition, x: number): void {
+        if (!this.taskContent?.isValid) {
+            return;
+        }
+        const learned = this.progress.learnedSkills.indexOf(skill.id) >= 0;
+        const card = this.createNode(`Skill_${skill.id}`, this.taskContent);
+        card.setPosition(x, -310);
+        card.getComponent(UITransform)?.setContentSize(190, 150);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = learned
+            ? new Color(skill.accent.r, skill.accent.g, skill.accent.b, 85)
+            : new Color(255, 250, 253, 240);
+        graphics.strokeColor = learned ? skill.accent : new Color(229, 207, 234, 235);
+        graphics.lineWidth = learned ? 4 : 2;
+        graphics.roundRect(-95, -75, 190, 150, 24);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = skill.accent;
+        graphics.circle(0, 39, 22);
+        graphics.fill();
+        this.addLabel(
+            card,
+            'SkillIcon',
+            skill.icon,
+            20,
+            Color.WHITE,
+            new Vec3(0, 40),
+            40,
+            34,
+            true,
+        );
+        this.addLabel(
+            card,
+            'SkillName',
+            skill.name,
+            19,
+            new Color(98, 63, 106, 255),
+            new Vec3(0, 2),
+            175,
+            30,
+            true,
+        );
+        this.addLabel(
+            card,
+            'SkillBonus',
+            `${this.taskStatLabel(skill.stat)} +${skill.statBonus}`,
+            15,
+            new Color(135, 91, 137, 235),
+            new Vec3(0, -27),
+            170,
+            26,
+            true,
+        );
+        this.addLabel(
+            card,
+            'SkillPrice',
+            learned ? '已学会' : `${skill.price} 金币`,
+            15,
+            learned ? skill.accent : new Color(154, 105, 80, 255),
+            new Vec3(0, -55),
+            160,
+            26,
+            true,
+        );
+        this.makeInteractive(card, () => this.learnSkill(skill));
+    }
+
+    private handleTaskAction(task: TaskDefinition): void {
+        if (this.progress.claimedTaskRewards.indexOf(task.id) >= 0) {
+            this.showTaskMessage('这项任务的奖励已经领取');
+            return;
+        }
+        if (this.getTaskProgress(task) < task.target) {
+            if (task.metric === 'skills') {
+                this.showTaskMessage('在下方选择一项技能学习即可完成');
+                return;
+            }
+            this.closeTaskPanel();
+            this.showCityToast(
+                task.metric === 'flowers'
+                    ? '去街区道路附近寻找会发光的花朵'
+                    : '靠近兼职点，完成三轮兼职积累收入',
+            );
+            return;
+        }
+
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins + task.rewardCoins,
+            gifts: this.progress.gifts + task.rewardGifts,
+            claimedTaskRewards: [...this.progress.claimedTaskRewards, task.id],
+        };
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        this.updateTaskButtonLabel();
+        gameFeel.play('success');
+        this.renderTaskPanel();
+        this.showTaskMessage(
+            `${task.title}完成：获得 ${task.rewardCoins} 金币和 ${task.rewardGifts} 份礼物`,
+        );
+    }
+
+    private learnSkill(skill: SkillDefinition): void {
+        if (this.progress.learnedSkills.indexOf(skill.id) >= 0) {
+            this.showTaskMessage(`已经学会${skill.name}`);
+            return;
+        }
+        if (this.progress.coins < skill.price) {
+            this.showTaskMessage(`金币不足，还需要 ${skill.price - this.progress.coins}`);
+            return;
+        }
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins - skill.price,
+            learnedSkills: [...this.progress.learnedSkills, skill.id],
+        };
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        this.updateCharmLabel();
+        gameFeel.play('success');
+        this.renderTaskPanel();
+        this.showTaskMessage(
+            `学会${skill.name}：${this.taskStatLabel(skill.stat)}永久 +${skill.statBonus}`,
+        );
+    }
+
+    private getTaskProgress(task: TaskDefinition): number {
+        if (task.metric === 'flowers') {
+            return this.progress.gatheredFlowers.length;
+        }
+        if (task.metric === 'jobIncome') {
+            return this.progress.jobIncomeEarned;
+        }
+        return this.progress.learnedSkills.length;
+    }
+
+    private updateTaskButtonLabel(): void {
+        if (!this.taskButtonLabel?.isValid) {
+            return;
+        }
+        const claimable = TASKS.filter((task) => (
+            this.progress.claimedTaskRewards.indexOf(task.id) < 0
+            && this.getTaskProgress(task) >= task.target
+        )).length + ROLE_TASKS.filter((task) => (
+            this.progress.claimedTaskRewards.indexOf(task.id) < 0
+            && this.isRoleTaskReady(task)
+        )).length;
+        this.taskButtonLabel.string = claimable > 0
+            ? `任务\n${claimable} 项可领`
+            : '兼职任务';
+    }
+
+    private updateCharmLabel(): void {
+        if (this.charmLabel?.isValid) {
+            this.charmLabel.string = `魅力 ${getCharmBreakdown(this.progress).total}`;
+        }
+    }
+
+    private taskStatLabel(stat: SkillDefinition['stat']): string {
+        return {
+            wisdom: '才智',
+            beauty: '美貌',
+            emotion: '情商',
+            insight: '洞察',
+        }[stat];
+    }
+
+    private showTaskMessage(message: string): void {
+        if (this.taskMessageLabel?.isValid) {
+            this.taskMessageLabel.string = message;
+        }
+    }
+
+    private closeTaskPanel(): void {
+        if (this.taskModal?.isValid) {
+            this.taskModal.destroy();
+        }
+        this.taskModal = null;
+        this.taskContent = null;
+        this.taskMessageLabel = null;
+        this.updateJobProximity();
+        this.updateVenueProximity();
+    }
+
+    private showCityToast(text: string): void {
+        const toast = this.createNode('CityToast', this.feedbackLayer);
+        toast.setPosition(0, 420);
+        toast.getComponent(UITransform)?.setContentSize(500, 60);
+        const graphics = toast.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 249, 253, 242);
+        graphics.strokeColor = new Color(238, 158, 197, 230);
+        graphics.lineWidth = 2;
+        graphics.roundRect(-250, -30, 500, 60, 30);
+        graphics.fill();
+        graphics.stroke();
+        this.addLabel(
+            toast,
+            'ToastLabel',
+            text,
+            18,
+            new Color(104, 68, 111, 255),
+            Vec3.ZERO,
+            460,
+            50,
+            true,
+        );
+        const opacity = toast.addComponent(UIOpacity);
+        tween(opacity)
+            .delay(1.4)
+            .to(0.25, { opacity: 0 })
+            .call(() => {
+                if (toast.isValid) {
+                    toast.destroy();
+                }
+            })
+            .start();
+    }
+
+    private openBeautyStudio(): void {
+        if (this.beautyModal?.isValid) {
+            return;
+        }
+        this.jobPromptButton.active = false;
+        this.venuePromptButton.active = false;
+        const modal = this.createNode('BeautyModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(48, 27, 57, 175);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('BeautyPanel', modal);
+        panel.getComponent(UITransform)?.setContentSize(700, 900);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 246, 251, 252);
+        graphics.strokeColor = new Color(230, 153, 192, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-350, -450, 700, 900, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(230, 140, 182, 255);
+        graphics.roundRect(-125, 370, 250, 64, 32);
+        graphics.fill();
+        this.addLabel(
+            panel,
+            'BeautyTitle',
+            '樱 色 美 妆',
+            31,
+            Color.WHITE,
+            new Vec3(0, 402),
+            360,
+            56,
+            true,
+        );
+        this.beautyCharmLabel = this.addLabel(
+            panel,
+            'BeautyCharm',
+            '',
+            21,
+            new Color(138, 79, 110, 255),
+            new Vec3(0, 330),
+            560,
+            40,
+            true,
+        );
+        this.addLabel(
+            panel,
+            'BeautyHint',
+            '化妆品永久生效，并会提高俘获角色所需的魅力值',
+            17,
+            new Color(148, 105, 144, 235),
+            new Vec3(0, 292),
+            590,
+            34,
+            true,
+        );
+        this.beautyContent = this.createNode('BeautyContent', panel);
+        this.beautyContent.setPosition(0, 10);
+        this.beautyContent.getComponent(UITransform)?.setContentSize(650, 540);
+        const message = this.addLabel(
+            panel,
+            'BeautyMessage',
+            `当前金币 ${this.progress.coins}`,
+            18,
+            new Color(139, 101, 139, 235),
+            new Vec3(0, -290),
+            580,
+            40,
+            true,
+        );
+        message.node.name = 'BeautyMessage';
+        this.createPanelButton(
+            panel,
+            'CloseBeauty',
+            '离开美妆店',
+            new Vec3(0, -374),
+            250,
+            56,
+            new Color(199, 165, 216, 255),
+            () => this.closeBeautyStudio(),
+        );
+        this.beautyModal = modal;
+        this.renderBeautyContent();
+    }
+
+    private renderBeautyContent(): void {
+        if (!this.beautyContent?.isValid) {
+            return;
+        }
+        for (const child of [...this.beautyContent.children]) {
+            child.destroy();
+        }
+        const charm = getCharmBreakdown(this.progress);
+        if (this.beautyCharmLabel?.isValid) {
+            this.beautyCharmLabel.string = `当前魅力 ${charm.total}`
+                + `（基础 ${charm.base} + 美妆 ${charm.cosmetics} + 医美 ${charm.surgery}）`;
+        }
+        const positions = [190, 10, -170];
+        COSMETICS.forEach((item, index) => {
+            this.createCosmeticCard(item, positions[index]);
+        });
+    }
+
+    private createCosmeticCard(item: CosmeticDefinition, y: number): void {
+        if (!this.beautyContent?.isValid) {
+            return;
+        }
+        const owned = this.progress.purchasedCosmetics.indexOf(item.id) >= 0;
+        const card = this.createNode(`Cosmetic_${item.id}`, this.beautyContent);
+        card.setPosition(0, y);
+        card.getComponent(UITransform)?.setContentSize(620, 155);
+        const graphics = card.addComponent(Graphics);
+        graphics.fillColor = owned
+            ? new Color(item.accent.r, item.accent.g, item.accent.b, 75)
+            : new Color(255, 251, 254, 242);
+        graphics.strokeColor = owned ? item.accent : new Color(235, 211, 237, 235);
+        graphics.lineWidth = owned ? 4 : 2;
+        graphics.roundRect(-310, -77, 620, 154, 25);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = item.accent;
+        graphics.circle(-260, 15, 30);
+        graphics.fill();
+        this.addLabel(
+            card,
+            'CosmeticIcon',
+            '妆',
+            22,
+            Color.WHITE,
+            new Vec3(-260, 15),
+            52,
+            38,
+            true,
+        );
+        this.addLabel(
+            card,
+            'CosmeticName',
+            item.name,
+            23,
+            new Color(95, 60, 104, 255),
+            new Vec3(-70, 40),
+            330,
+            36,
+            true,
+        );
+        this.addLabel(
+            card,
+            'CosmeticDescription',
+            item.description,
+            16,
+            new Color(127, 87, 128, 235),
+            new Vec3(-65, 3),
+            360,
+            44,
+            true,
+        );
+        this.addLabel(
+            card,
+            'CosmeticBonus',
+            `魅力 +${item.charmBonus}`,
+            17,
+            item.accent,
+            new Vec3(-78, -48),
+            280,
+            28,
+            true,
+        );
+        this.createPanelButton(
+            card,
+            'BuyCosmetic',
+            owned ? '已拥有' : `${item.price} 金币`,
+            new Vec3(225, 0),
+            145,
+            58,
+            owned ? new Color(181, 168, 188, 255) : item.accent,
+            () => this.buyCosmetic(item),
+        );
+    }
+
+    private buyCosmetic(item: CosmeticDefinition): void {
+        if (this.progress.purchasedCosmetics.indexOf(item.id) >= 0) {
+            this.showBeautyMessage(`${item.name}已经购买并生效`);
+            return;
+        }
+        if (this.progress.coins < item.price) {
+            this.showBeautyMessage(`金币不足，还需要 ${item.price - this.progress.coins}`);
+            return;
+        }
+        this.progress = {
+            ...this.progress,
+            coins: this.progress.coins - item.price,
+            purchasedCosmetics: [...this.progress.purchasedCosmetics, item.id],
+        };
+        saveProgress(this.progress);
+        this.updateCoinLabel();
+        this.updateCharmLabel();
+        gameFeel.play('success');
+        this.renderBeautyContent();
+        this.showBeautyMessage(`${item.name}已购买：魅力永久 +${item.charmBonus}`);
+    }
+
+    private showBeautyMessage(message: string): void {
+        const label = this.beautyModal
+            ?.getChildByName('BeautyPanel')
+            ?.getChildByName('BeautyMessage')
+            ?.getComponent(Label);
+        if (label?.isValid) {
+            label.string = message;
+        }
+    }
+
+    private closeBeautyStudio(): void {
+        if (this.beautyModal?.isValid) {
+            this.beautyModal.destroy();
+        }
+        this.beautyModal = null;
+        this.beautyContent = null;
+        this.beautyCharmLabel = null;
+        this.updateJobProximity();
+        this.updateVenueProximity();
     }
 
     private openWardrobe(): void {
@@ -1320,6 +2409,7 @@ export class CityExplore extends Component {
         }
         saveProgress(this.progress);
         this.updateCoinLabel();
+        this.updateCharmLabel();
         this.updateWardrobePreview();
         this.renderWardrobeList();
     }
@@ -1630,6 +2720,7 @@ export class CityExplore extends Component {
             };
             saveProgress(this.progress);
             this.updatePartnerButtonLabel();
+            this.updateCharmLabel();
             if (this.partnerActiveLabel?.isValid) {
                 this.partnerActiveLabel.string = `当前：${partner.name} · ${this.partnerSupportText(partner)}`;
             }
@@ -1996,21 +3087,35 @@ export class CityExplore extends Component {
         const accuracy = Math.max(0, Math.min(1, 1 - distance / 0.38));
         const partner = getPartnerSupport(this.progress.activePartner);
         const partnerBonus = partner?.jobBonuses[this.currentJob.id] ?? 0;
-        const reward = this.currentJob.baseReward
+        const completedRuns = this.progress.jobRuns[this.currentJob.id] ?? 0;
+        const repeatMultiplier = Math.max(
+            ECONOMY.jobRepeatMultiplierFloor,
+            1 - completedRuns * ECONOMY.jobRepeatMultiplierStep,
+        );
+        const rawReward = this.currentJob.baseReward
             + Math.round(this.currentJob.bonusReward * accuracy)
             + partnerBonus;
+        const reward = Math.max(1, Math.round(rawReward * repeatMultiplier));
         this.jobRoundIncome += reward;
         this.jobTotalIncome += reward;
+        const nextJobRuns = { ...this.progress.jobRuns };
+        if (this.jobRound >= 3) {
+            nextJobRuns[this.currentJob.id] = completedRuns + 1;
+        }
         this.progress = {
             ...this.progress,
             coins: this.progress.coins + reward,
+            jobIncomeEarned: this.progress.jobIncomeEarned + reward,
+            jobRuns: nextJobRuns,
         };
         saveProgress(this.progress);
         this.updateCoinLabel();
+        this.updateTaskButtonLabel();
         gameFeel.play('success');
         if (this.jobStatusLabel?.isValid) {
             this.jobStatusLabel.string = `本轮 +${reward} 金币 · 准确度 ${Math.round(accuracy * 100)}%`
-                + (partnerBonus > 0 ? ` · 搭档 +${partnerBonus}` : '');
+                + (partnerBonus > 0 ? ` · 搭档 +${partnerBonus}` : '')
+                + (repeatMultiplier < 1 ? ` · 重复收益 ${Math.round(repeatMultiplier * 100)}%` : '');
         }
         if (this.jobRound >= 3) {
             this.jobCompleted = true;

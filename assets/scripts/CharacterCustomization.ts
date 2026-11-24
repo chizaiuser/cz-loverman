@@ -307,16 +307,16 @@ export class CharacterCustomization extends Component {
             true,
         );
 
-        const optionXs = [-315, -252, -189, -126, -63];
+        const optionXs = [-332, -266, -200, -134, -68];
         OUTFITS.forEach((outfit, index) => {
             const option = this.createUiNode(`StartingOutfit_${outfit.id}`, this.characterLayer);
             option.setPosition(optionXs[index], -468);
-            option.getComponent(UITransform)?.setContentSize(60, 72);
+            option.getComponent(UITransform)?.setContentSize(58, 72);
             const graphics = option.addComponent(Graphics);
             graphics.fillColor = new Color(255, 248, 252, 242);
             graphics.strokeColor = outfit.accent;
             graphics.lineWidth = 3;
-            graphics.roundRect(-30, -36, 60, 72, 16);
+            graphics.roundRect(-29, -36, 58, 72, 16);
             graphics.fill();
             graphics.stroke();
             graphics.fillColor = outfit.accent;
@@ -329,7 +329,7 @@ export class CharacterCustomization extends Component {
                 11,
                 new Color(102, 68, 110, 255),
                 new Vec3(0, -19),
-                54,
+                52,
                 34,
                 true,
             );
@@ -455,7 +455,7 @@ export class CharacterCustomization extends Component {
             '选择性格',
             27,
             new Color(126, 82, 137, 255),
-            new Vec3(0, 68),
+            new Vec3(0, 55),
             300,
             48,
             true,
@@ -466,7 +466,7 @@ export class CharacterCustomization extends Component {
             '初始属性',
             27,
             new Color(126, 82, 137, 255),
-            new Vec3(0, -98),
+            new Vec3(0, -130),
             300,
             48,
             true,
@@ -486,7 +486,7 @@ export class CharacterCustomization extends Component {
             this.createPersonalityOption(
                 choice,
                 PANEL_X + columnX[index],
-                PANEL_Y - 36,
+                PANEL_Y - 25,
             );
         });
 
@@ -630,13 +630,13 @@ export class CharacterCustomization extends Component {
     private createPersonalityOption(choice: PersonalityChoice, x: number, y: number): void {
         const option = this.createUiNode(`Personality_${choice.name}`, this.selectionLayer);
         option.setPosition(x, y);
-        option.getComponent(UITransform)?.setContentSize(78, 108);
+        option.getComponent(UITransform)?.setContentSize(74, 108);
 
         const graphics = option.addComponent(Graphics);
         graphics.fillColor = choice.color;
         graphics.strokeColor = new Color(255, 255, 255, 210);
         graphics.lineWidth = 2;
-        graphics.roundRect(-39, -54, 78, 108, 16);
+        graphics.roundRect(-37, -54, 74, 108, 16);
         graphics.fill();
         graphics.stroke();
 
@@ -674,7 +674,7 @@ export class CharacterCustomization extends Component {
             true,
         );
 
-        const selection = this.createSelectionRing(option, 39, 'card');
+        const selection = this.createSelectionRing(option, 37, 'card');
         selection.active = false;
         this.personalityOptions.set(choice.name, option);
         this.makeInteractive(option, () => {
@@ -710,10 +710,10 @@ export class CharacterCustomization extends Component {
     }
 
     private createAttributes(): void {
-        this.createAttributeBar('Wisdom', 'wisdom', '才智', -150, new Color(250, 145, 178, 255));
-        this.createAttributeBar('Beauty', 'beauty', '美貌', -192, new Color(231, 160, 220, 255));
-        this.createAttributeBar('Emotion', 'emotion', '情商', -234, new Color(252, 163, 187, 255));
-        this.createAttributeBar('Insight', 'insight', '洞察力', -276, new Color(172, 168, 239, 255));
+        this.createAttributeBar('Wisdom', 'wisdom', '才智', -190, new Color(250, 145, 178, 255));
+        this.createAttributeBar('Beauty', 'beauty', '美貌', -236, new Color(231, 160, 220, 255));
+        this.createAttributeBar('Emotion', 'emotion', '情商', -282, new Color(252, 163, 187, 255));
+        this.createAttributeBar('Insight', 'insight', '洞察力', -328, new Color(172, 168, 239, 255));
         this.refreshAttributePreview();
     }
 

@@ -24,6 +24,7 @@ import {
     saveProgress,
 } from './GameProgress';
 import { gameFeel } from './GameFeel';
+import { getCharacterLore } from './CharacterLoreData';
 
 const { ccclass } = _decorator;
 
@@ -860,10 +861,28 @@ export class CharacterGallery extends Component {
         }
         this.showModal(
             entry.name,
-            `${entry.description}\n\n心动值：${getBond(this.progress, entry.id)}/6\n`
-                + `俘获状态：${this.progress.capturedCharacters.indexOf(entry.id) >= 0 ? '已俘获' : '尚未俘获'}`,
+            this.characterProfileText(entry),
             entry.accent,
+            22,
         );
+    }
+
+    private characterProfileText(entry: CharacterEntry): string {
+        const lore = getCharacterLore(entry.id);
+        const capture = this.progress.capturedCharacters.indexOf(entry.id) >= 0
+            ? '已俘获'
+            : '尚未俘获';
+        if (!lore) {
+            return `${entry.description}\n\n心动值：${getBond(this.progress, entry.id)}/6\n`
+                + `俘获状态：${capture}`;
+        }
+        return `${entry.description}\n\n`
+            + `年龄 ${lore.age} · ${lore.job}\n`
+            + `性格：${lore.personality}\n`
+            + `偏好：${lore.preference}\n`
+            + `关系：${lore.relationship}\n`
+            + `故事钩子：${lore.hook}\n`
+            + `心动值：${getBond(this.progress, entry.id)}/6 · ${capture}`;
     }
 
     private sendGift(): void {
@@ -1001,7 +1020,12 @@ export class CharacterGallery extends Component {
         this.toastNode = toast;
     }
 
-    private showModal(title: string, message: string, accent: Color): void {
+    private showModal(
+        title: string,
+        message: string,
+        accent: Color,
+        messageFontSize = 27,
+    ): void {
         if (this.modal?.isValid) {
             this.modal.destroy();
         }
@@ -1032,7 +1056,7 @@ export class CharacterGallery extends Component {
             panel,
             'Message',
             message,
-            27,
+            messageFontSize,
             new Color(88, 57, 87, 255),
             new Vec3(0, 8),
             520,
