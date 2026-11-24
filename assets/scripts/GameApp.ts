@@ -199,9 +199,9 @@ export class GameApp extends Component {
         const player = this.createSpriteNode(
             this.characterLayer,
             'PlayerCharacter',
-            'scene/layers/pink-girl/spriteFrame',
+            'scene/layers/pink-girl-hd/spriteFrame',
             new Vec3(-200, -205),
-            270,
+            213,
             540,
         );
         this.makeInteractive(player, () => this.showModal(

@@ -688,10 +688,10 @@ export class CityExplore extends Component {
         shadowGraphics.fill();
 
         this.playerVisual = this.createNode('PlayerVisual', this.player);
-        this.playerVisual.getComponent(UITransform)?.setContentSize(82, 164);
+        this.playerVisual.getComponent(UITransform)?.setContentSize(65, 166);
         const sprite = this.playerVisual.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        resources.load('scene/layers/pink-girl/spriteFrame', SpriteFrame, (error, frame) => {
+        resources.load('scene/layers/pink-girl-hd/spriteFrame', SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 gameFeel.showMissingImage(this.playerVisual, '主角素材缺失');
                 return;
@@ -2243,10 +2243,10 @@ export class CityExplore extends Component {
 
         this.wardrobePreviewVisual = this.createNode('WardrobePreview', previewCard);
         this.wardrobePreviewVisual.setPosition(0, 75);
-        this.wardrobePreviewVisual.getComponent(UITransform)?.setContentSize(180, 360);
+        this.wardrobePreviewVisual.getComponent(UITransform)?.setContentSize(142, 360);
         const previewSprite = this.wardrobePreviewVisual.addComponent(Sprite);
         previewSprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        resources.load('scene/layers/pink-girl/spriteFrame', SpriteFrame, (error, frame) => {
+        resources.load('scene/layers/pink-girl-hd/spriteFrame', SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 gameFeel.showMissingImage(this.wardrobePreviewVisual, '角色素材缺失');
                 return;

@@ -1228,10 +1228,10 @@ export class ChallengeArena extends Component {
         graphics.stroke();
 
         const spriteNode = this.createNode('PlayerSprite', frame);
-        spriteNode.getComponent(UITransform)?.setContentSize(104, 230);
+        spriteNode.getComponent(UITransform)?.setContentSize(91, 230);
         const sprite = spriteNode.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        resources.load('scene/layers/pink-girl/spriteFrame', SpriteFrame, (error, image) => {
+        resources.load('scene/layers/pink-girl-hd/spriteFrame', SpriteFrame, (error, image) => {
             if (error || !image) {
                 gameFeel.showMissingImage(spriteNode, '主角');
                 return;

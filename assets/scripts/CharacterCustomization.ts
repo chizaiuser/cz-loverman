@@ -267,10 +267,10 @@ export class CharacterCustomization extends Component {
 
         this.previewCharacter = this.createUiNode('CharacterPreview', this.characterLayer);
         this.previewCharacter.setPosition(-190, -30);
-        this.previewCharacter.getComponent(UITransform)?.setContentSize(310, 620);
+        this.previewCharacter.getComponent(UITransform)?.setContentSize(250, 632);
         const sprite = this.previewCharacter.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        this.loadSprite(sprite, 'scene/layers/pink-girl/spriteFrame');
+        this.loadSprite(sprite, 'scene/layers/pink-girl-hd/spriteFrame');
         this.refreshOutfitPreview();
         gameFeel.float(this.previewCharacter, 4, 1.7);
         this.makeInteractive(this.previewCharacter, () => this.showModal(

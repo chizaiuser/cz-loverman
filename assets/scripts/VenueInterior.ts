@@ -538,10 +538,10 @@ export class VenueInterior extends Component {
 
         const player = this.createNode('VenuePlayer', this.characterLayer);
         player.setPosition(0, -525);
-        player.getComponent(UITransform)?.setContentSize(74, 138);
+        player.getComponent(UITransform)?.setContentSize(55, 138);
         const sprite = player.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
-        resources.load('scene/layers/pink-girl/spriteFrame', SpriteFrame, (error, frame) => {
+        resources.load('scene/layers/pink-girl-hd/spriteFrame', SpriteFrame, (error, frame) => {
             if (error || !frame) {
                 gameFeel.showMissingImage(player, '你');
                 return;
