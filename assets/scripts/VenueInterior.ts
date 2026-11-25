@@ -3,6 +3,7 @@ import {
     Color,
     Component,
     director,
+    EventTouch,
     Graphics,
     HorizontalTextAlignment,
     Label,
@@ -10,6 +11,7 @@ import {
     resources,
     Sprite,
     SpriteFrame,
+    sys,
     tween,
     UIOpacity,
     UITransform,
@@ -28,7 +30,7 @@ import {
     PlayerProgress,
     saveProgress,
 } from './GameProgress';
-import { getPartnerPortraitPath, PartnerSupport } from './PartnerData';
+import { getPartnerPortraitPath, getPartnerSupport, PartnerSupport } from './PartnerData';
 import {
     getActiveVenue,
     getVenuePartners,
@@ -37,11 +39,14 @@ import {
 } from './VenueData';
 import { SURGERIES, SurgeryDefinition } from './BeautyData';
 import { getCharacterLore } from './CharacterLoreData';
+import { getOutfit, OUTFITS, OutfitDefinition } from './WardrobeData';
 
 const { ccclass } = _decorator;
 
 const DESIGN_WIDTH = 750;
 const DESIGN_HEIGHT = 1334;
+const HOME_ENTER_KEY = 'loverman.home.enter';
+const HOME_ACCENT = new Color(216, 153, 194, 255);
 
 @ccclass('VenueInterior')
 export class VenueInterior extends Component {
@@ -63,12 +68,22 @@ export class VenueInterior extends Component {
     private surgeryCharmLabel: Label | null = null;
     private infoModal: Node | null = null;
     private toastNode: Node | null = null;
+    private homeWardrobeModal: Node | null = null;
+    private homeWardrobeList: Node | null = null;
+    private homeCoinLabel: Label | null = null;
+    private homeMode = false;
     private actionLocked = false;
 
     protected start(): void {
         this.progress = loadProgress();
         if (!this.progress.onboardingComplete) {
             director.loadScene('CharacterCustomization');
+            return;
+        }
+        const enterHome = sys.localStorage.getItem(HOME_ENTER_KEY) === '1';
+        sys.localStorage.removeItem(HOME_ENTER_KEY);
+        if (enterHome) {
+            this.startHome();
             return;
         }
         const venue = getActiveVenue();
@@ -86,6 +101,567 @@ export class VenueInterior extends Component {
         this.createHud();
         this.showVenueIntro();
         gameFeel.fadeIn(this.node);
+    }
+
+    private startHome(): void {
+        this.homeMode = true;
+        gameFeel.init();
+        this.createLayers();
+        this.createHomeBackground();
+        this.createHomeFurniture();
+        this.createHomeCharacters();
+        this.createHomeHud();
+        gameFeel.fadeIn(this.node);
+    }
+
+    private createHomeBackground(): void {
+        const gradient = this.createNode('HomeGradient', this.backgroundLayer);
+        gradient.getComponent(UITransform)?.setContentSize(DESIGN_WIDTH, DESIGN_HEIGHT);
+        const graphics = gradient.addComponent(Graphics);
+        const bands = 34;
+        const bandHeight = DESIGN_HEIGHT / bands;
+        const top = new Color(113, 91, 136, 255);
+        const middle = new Color(220, 169, 194, 255);
+        const bottom = new Color(255, 220, 219, 255);
+        for (let index = 0; index < bands; index += 1) {
+            const ratio = index / (bands - 1);
+            graphics.fillColor = ratio < 0.58
+                ? this.lerpColor(top, middle, ratio / 0.58)
+                : this.lerpColor(middle, bottom, (ratio - 0.58) / 0.42);
+            graphics.rect(
+                -DESIGN_WIDTH / 2,
+                DESIGN_HEIGHT / 2 - (index + 1) * bandHeight,
+                DESIGN_WIDTH,
+                bandHeight + 1,
+            );
+            graphics.fill();
+        }
+
+        const wall = this.createNode('HomeWall', this.backgroundLayer);
+        const wallGraphics = wall.addComponent(Graphics);
+        wallGraphics.fillColor = new Color(255, 235, 239, 220);
+        wallGraphics.roundRect(-375, -90, 750, 600, 0);
+        wallGraphics.fill();
+        wallGraphics.strokeColor = new Color(255, 250, 244, 120);
+        wallGraphics.lineWidth = 3;
+        for (let index = -3; index <= 3; index += 1) {
+            wallGraphics.moveTo(index * 96, -80);
+            wallGraphics.lineTo(index * 96, 500);
+        }
+        wallGraphics.stroke();
+
+        const window = this.createNode('HomeWindow', this.backgroundLayer);
+        window.setPosition(0, 185);
+        const windowGraphics = window.addComponent(Graphics);
+        windowGraphics.fillColor = new Color(123, 126, 182, 225);
+        windowGraphics.roundRect(-178, -150, 356, 300, 28);
+        windowGraphics.fill();
+        windowGraphics.strokeColor = new Color(255, 244, 235, 235);
+        windowGraphics.lineWidth = 8;
+        windowGraphics.roundRect(-178, -150, 356, 300, 28);
+        windowGraphics.stroke();
+        windowGraphics.fillColor = new Color(255, 215, 191, 215);
+        windowGraphics.circle(72, 74, 44);
+        windowGraphics.fill();
+        windowGraphics.strokeColor = new Color(255, 247, 240, 220);
+        windowGraphics.lineWidth = 5;
+        windowGraphics.moveTo(0, -144);
+        windowGraphics.lineTo(0, 144);
+        windowGraphics.moveTo(-172, 0);
+        windowGraphics.lineTo(172, 0);
+        windowGraphics.stroke();
+        windowGraphics.fillColor = new Color(202, 139, 172, 230);
+        windowGraphics.roundRect(-225, -145, 52, 300, 22);
+        windowGraphics.roundRect(173, -145, 52, 300, 22);
+        windowGraphics.fill();
+
+        const floor = this.createNode('HomeFloor', this.backgroundLayer);
+        floor.setPosition(0, -430);
+        const floorGraphics = floor.addComponent(Graphics);
+        floorGraphics.fillColor = new Color(232, 192, 185, 255);
+        floorGraphics.moveTo(-375, 250);
+        floorGraphics.lineTo(375, 250);
+        floorGraphics.lineTo(440, -237);
+        floorGraphics.lineTo(-440, -237);
+        floorGraphics.close();
+        floorGraphics.fill();
+        floorGraphics.strokeColor = new Color(255, 238, 225, 120);
+        floorGraphics.lineWidth = 3;
+        for (let index = -5; index <= 5; index += 1) {
+            floorGraphics.moveTo(index * 70, 250);
+            floorGraphics.lineTo(index * 105, -237);
+        }
+        for (let index = 0; index < 7; index += 1) {
+            const y = 216 - index * 76;
+            const width = 330 + index * 16;
+            floorGraphics.moveTo(-width, y);
+            floorGraphics.lineTo(width, y);
+        }
+        floorGraphics.stroke();
+        floorGraphics.fillColor = new Color(250, 221, 227, 210);
+        floorGraphics.ellipse(0, -44, 214, 92);
+        floorGraphics.fill();
+    }
+
+    private createHomeFurniture(): void {
+        const wardrobe = this.createNode('HomeWardrobe', this.decorLayer);
+        wardrobe.setPosition(235, -120);
+        wardrobe.getComponent(UITransform)?.setContentSize(210, 390);
+        const wardrobeGraphics = wardrobe.addComponent(Graphics);
+        wardrobeGraphics.fillColor = new Color(91, 64, 82, 55);
+        wardrobeGraphics.ellipse(14, -4, 102, 26);
+        wardrobeGraphics.fill();
+        wardrobeGraphics.fillColor = new Color(146, 107, 123, 255);
+        wardrobeGraphics.moveTo(90, 0);
+        wardrobeGraphics.lineTo(135, 42);
+        wardrobeGraphics.lineTo(135, 348);
+        wardrobeGraphics.lineTo(90, 306);
+        wardrobeGraphics.close();
+        wardrobeGraphics.fill();
+        wardrobeGraphics.fillColor = new Color(204, 156, 166, 255);
+        wardrobeGraphics.roundRect(-90, 0, 180, 306, 16);
+        wardrobeGraphics.fill();
+        wardrobeGraphics.strokeColor = new Color(255, 238, 229, 230);
+        wardrobeGraphics.lineWidth = 4;
+        wardrobeGraphics.roundRect(-90, 0, 180, 306, 16);
+        wardrobeGraphics.stroke();
+        wardrobeGraphics.fillColor = new Color(176, 123, 140, 255);
+        wardrobeGraphics.roundRect(-74, 178, 148, 8, 4);
+        wardrobeGraphics.fill();
+        wardrobeGraphics.strokeColor = new Color(172, 118, 132, 210);
+        wardrobeGraphics.lineWidth = 3;
+        wardrobeGraphics.moveTo(0, 18);
+        wardrobeGraphics.lineTo(0, 290);
+        wardrobeGraphics.stroke();
+        wardrobeGraphics.fillColor = new Color(255, 230, 166, 255);
+        wardrobeGraphics.circle(-10, 154, 6);
+        wardrobeGraphics.circle(10, 154, 6);
+        wardrobeGraphics.fill();
+        this.addHomeHotspot(wardrobe, 0, 326, '衣', HOME_ACCENT, () => this.openHomeWardrobe());
+
+        const desk = this.createNode('HomeDesk', this.decorLayer);
+        desk.setPosition(-218, -318);
+        desk.getComponent(UITransform)?.setContentSize(270, 190);
+        const deskGraphics = desk.addComponent(Graphics);
+        deskGraphics.fillColor = new Color(87, 61, 83, 50);
+        deskGraphics.ellipse(8, -6, 126, 24);
+        deskGraphics.fill();
+        deskGraphics.fillColor = new Color(125, 86, 103, 255);
+        deskGraphics.roundRect(-108, 0, 18, 106, 8);
+        deskGraphics.roundRect(90, 0, 18, 106, 8);
+        deskGraphics.fill();
+        deskGraphics.fillColor = new Color(240, 201, 172, 255);
+        deskGraphics.roundRect(-122, 96, 244, 18, 8);
+        deskGraphics.fill();
+        deskGraphics.fillColor = new Color(84, 73, 112, 255);
+        deskGraphics.roundRect(-54, 114, 108, 62, 10);
+        deskGraphics.fill();
+        deskGraphics.fillColor = new Color(166, 213, 235, 230);
+        deskGraphics.roundRect(-44, 125, 88, 38, 7);
+        deskGraphics.fill();
+        deskGraphics.fillColor = new Color(255, 239, 174, 255);
+        deskGraphics.circle(84, 130, 12);
+        deskGraphics.fill();
+        this.addHomeHotspot(desk, 0, 150, '记', new Color(182, 166, 230, 255), () => {
+            const stats = getEffectiveStats(this.progress);
+            this.showInfoModal(
+                '今日手账',
+                `${this.progress.playerName}的小家安静又温暖。\n\n`
+                    + `才智 ${stats.wisdom} · 美貌 ${stats.beauty}\n`
+                    + `情商 ${stats.emotion} · 洞察 ${stats.insight}\n\n`
+                    + `金币 ${this.progress.coins} · 礼物 ${this.progress.gifts}\n`
+                    + '之后可以在书桌集中查看街区委托和每日事件。',
+                new Color(178, 159, 226, 255),
+            );
+        });
+
+        const shelf = this.createNode('HomeMemoryShelf', this.decorLayer);
+        shelf.setPosition(-232, -92);
+        shelf.getComponent(UITransform)?.setContentSize(210, 310);
+        const shelfGraphics = shelf.addComponent(Graphics);
+        shelfGraphics.fillColor = new Color(93, 67, 91, 50);
+        shelfGraphics.ellipse(6, -2, 96, 20);
+        shelfGraphics.fill();
+        shelfGraphics.fillColor = new Color(128, 91, 119, 255);
+        shelfGraphics.roundRect(-92, 0, 184, 232, 14);
+        shelfGraphics.fill();
+        const shelfColors = [
+            new Color(255, 166, 191, 255),
+            new Color(175, 198, 238, 255),
+            new Color(255, 220, 157, 255),
+            new Color(188, 168, 229, 255),
+        ];
+        for (let row = 0; row < 3; row += 1) {
+            shelfGraphics.fillColor = new Color(245, 220, 221, 255);
+            shelfGraphics.roundRect(-80, 36 + row * 62, 160, 7, 3);
+            shelfGraphics.fill();
+            for (let index = 0; index < 6; index += 1) {
+                shelfGraphics.fillColor = shelfColors[(row + index) % shelfColors.length];
+                shelfGraphics.roundRect(-74 + index * 25, 45 + row * 62, 16, 38, 3);
+                shelfGraphics.fill();
+            }
+        }
+        this.addHomeHotspot(shelf, 0, 252, '忆', new Color(230, 159, 189, 255), () => {
+            const captured = this.progress.capturedCharacters.length;
+            const partner = getPartnerSupport(this.progress.activePartner);
+            this.showInfoModal(
+                '回忆架',
+                `已经俘获 ${captured} 位角色。\n`
+                    + `心动图鉴 ${this.progress.hearts} 颗心。\n`
+                    + `${partner ? `现在最常陪在身边的是${partner.name}。` : '还没有固定的搭档。'}\n\n`
+                    + '之后收到的纪念物、章节照片和角色礼物都会陈列在这里。',
+                new Color(220, 149, 180, 255),
+            );
+        });
+
+        const bed = this.createNode('HomeBed', this.decorLayer);
+        bed.setPosition(232, -390);
+        bed.getComponent(UITransform)?.setContentSize(260, 210);
+        const bedGraphics = bed.addComponent(Graphics);
+        bedGraphics.fillColor = new Color(88, 59, 83, 45);
+        bedGraphics.ellipse(8, -4, 124, 24);
+        bedGraphics.fill();
+        bedGraphics.fillColor = new Color(135, 96, 119, 255);
+        bedGraphics.roundRect(-116, 18, 232, 92, 20);
+        bedGraphics.fill();
+        bedGraphics.fillColor = new Color(255, 229, 233, 255);
+        bedGraphics.roundRect(-110, 58, 220, 84, 22);
+        bedGraphics.fill();
+        bedGraphics.fillColor = new Color(247, 184, 206, 255);
+        bedGraphics.roundRect(-106, 70, 128, 62, 18);
+        bedGraphics.fill();
+        bedGraphics.fillColor = new Color(255, 250, 249, 255);
+        bedGraphics.roundRect(14, 96, 80, 36, 14);
+        bedGraphics.fill();
+        bedGraphics.fillColor = new Color(126, 88, 114, 255);
+        bedGraphics.roundRect(-122, 0, 244, 24, 9);
+        bedGraphics.fill();
+        this.addHomeHotspot(bed, 0, 190, '眠', new Color(202, 178, 231, 255), () => {
+            saveProgress(this.progress);
+            this.showInfoModal(
+                '休息一下',
+                '你把今天的线索、金币和服装整理好，放在了床边。\n\n'
+                    + '当前还没有昼夜系统，这里先作为自动整理和阶段回顾的安全点。',
+                new Color(193, 166, 226, 255),
+            );
+        });
+    }
+
+    private addHomeHotspot(
+        parent: Node,
+        x: number,
+        y: number,
+        icon: string,
+        accent: Color,
+        onTap: () => void,
+    ): void {
+        const hotspot = this.createNode('HomeHotspot', parent);
+        hotspot.setPosition(x, y);
+        hotspot.getComponent(UITransform)?.setContentSize(58, 58);
+        const graphics = hotspot.addComponent(Graphics);
+        graphics.fillColor = new Color(accent.r, accent.g, accent.b, 55);
+        graphics.circle(0, 0, 27);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 249, 252, 245);
+        graphics.strokeColor = accent;
+        graphics.lineWidth = 3;
+        graphics.circle(0, 0, 20);
+        graphics.fill();
+        graphics.stroke();
+        this.addLabel(
+            hotspot,
+            'HotspotIcon',
+            icon,
+            18,
+            new Color(105, 70, 112, 255),
+            Vec3.ZERO,
+            34,
+            34,
+            true,
+        );
+        this.makeInteractive(parent, onTap);
+        tween(hotspot)
+            .repeatForever(
+                tween()
+                    .to(0.9, { scale: new Vec3(1.08, 1.08, 1) }, { easing: 'sineInOut' })
+                    .to(0.9, { scale: Vec3.ONE }, { easing: 'sineInOut' }),
+            )
+            .start();
+    }
+
+    private createHomeCharacters(): void {
+        this.createHomePerson(
+            'HomePlayer',
+            'scene/layers/pink-girl-hd/spriteFrame',
+            new Vec3(0, -520),
+            62,
+            156,
+            () => this.showInfoModal(
+                '回到家',
+                `${this.progress.playerName}终于回到了自己的房间。\n\n`
+                    + '外面的喧闹被关在门外，可以慢慢换衣服、整理纪念，或者只是坐一会儿。',
+                HOME_ACCENT,
+            ),
+        );
+        const partner = getPartnerSupport(this.progress.activePartner);
+        if (partner && this.progress.unlockedCharacters.indexOf(partner.id) >= 0) {
+            this.createHomePerson(
+                'HomeActivePartner',
+                getPartnerPortraitPath(partner.id),
+                new Vec3(148, -520),
+                82,
+                128,
+                () => this.showInfoModal(
+                    partner.name,
+                    `${partner.name}坐在窗边等你。\n\n`
+                        + '“外面逛了这么久，先休息一下吧。”\n\n'
+                        + `当前支援：${this.homePartnerText(partner)}`,
+                    partner.accent,
+                ),
+            );
+        }
+    }
+
+    private createHomePerson(
+        name: string,
+        resourcePath: string,
+        position: Vec3,
+        width: number,
+        height: number,
+        onTap: () => void,
+    ): void {
+        const root = this.createNode(name, this.characterLayer);
+        root.setPosition(position);
+        root.getComponent(UITransform)?.setContentSize(width, height + 30);
+        const shadow = this.createNode('HomePersonShadow', root);
+        shadow.setPosition(0, -2);
+        shadow.getComponent(UITransform)?.setContentSize(width * 0.8, 20);
+        const shadowGraphics = shadow.addComponent(Graphics);
+        shadowGraphics.fillColor = new Color(86, 57, 81, 65);
+        shadowGraphics.ellipse(0, 0, width * 0.4, 14);
+        shadowGraphics.fill();
+        const visual = this.createNode('HomePersonVisual', root);
+        visual.setPosition(0, height / 2 + 4);
+        visual.getComponent(UITransform)?.setContentSize(width, height);
+        const sprite = visual.addComponent(Sprite);
+        sprite.sizeMode = Sprite.SizeMode.CUSTOM;
+        resources.load(resourcePath, SpriteFrame, (error, frame) => {
+            if (error || !frame) {
+                gameFeel.showMissingImage(visual, '角色');
+                return;
+            }
+            if (sprite.isValid) {
+                sprite.spriteFrame = frame;
+            }
+        });
+        this.makeInteractive(visual, onTap);
+    }
+
+    private homePartnerText(partner: PartnerSupport): string {
+        const stat = {
+            wisdom: '才智',
+            beauty: '美貌',
+            emotion: '情商',
+            insight: '洞察',
+        }[partner.stat];
+        return `${partner.role} · ${stat} +${partner.statBonus}`;
+    }
+
+    private createHomeHud(): void {
+        const topBar = this.createNode('HomeTopBar', this.hudLayer);
+        topBar.setPosition(0, 578);
+        topBar.getComponent(UITransform)?.setContentSize(700, 92);
+        const graphics = topBar.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 250, 238);
+        graphics.strokeColor = new Color(255, 255, 255, 225);
+        graphics.lineWidth = 3;
+        graphics.roundRect(-350, -46, 700, 92, 34);
+        graphics.fill();
+        graphics.stroke();
+        this.addLabel(topBar, 'HomeTitle', '花 语 公 寓', 31, new Color(103, 66, 105, 255), new Vec3(0, 14), 480, 44, true);
+        this.addLabel(
+            topBar,
+            'HomeSubtitle',
+            `${this.progress.playerName}的房间 · 轻触家具整理生活`,
+            17,
+            new Color(150, 103, 139, 235),
+            new Vec3(0, -24),
+            560,
+            28,
+            true,
+        );
+        this.createButton(
+            this.hudLayer,
+            'LeaveHome',
+            '返回街区',
+            new Vec3(-280, 493),
+            142,
+            54,
+            HOME_ACCENT,
+            () => director.loadScene('CityExplore'),
+        );
+        this.addPillLabel(
+            new Vec3(112, 493),
+            250,
+            `金币 ${this.progress.coins} · 魅力 ${getCharmBreakdown(this.progress).total}`,
+            new Color(255, 241, 246, 240),
+            HOME_ACCENT,
+        );
+        this.addLabel(
+            this.hudLayer,
+            'HomeHint',
+            '衣橱换装 · 书桌看手账 · 回忆架看收藏 · 床边休息',
+            16,
+            new Color(114, 78, 112, 220),
+            new Vec3(0, -620),
+            620,
+            32,
+            true,
+        );
+    }
+
+    private openHomeWardrobe(): void {
+        if (this.homeWardrobeModal?.isValid) {
+            return;
+        }
+        const modal = this.createNode('HomeWardrobeModal', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(43, 28, 54, 168);
+        shade.rect(-375, -667, 750, 1334);
+        shade.fill();
+        const panel = this.createNode('HomeWardrobePanel', modal);
+        panel.getComponent(UITransform)?.setContentSize(680, 930);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 247, 250, 252);
+        graphics.strokeColor = new Color(211, 159, 206, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-340, -465, 680, 930, 42);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(205, 150, 207, 255);
+        graphics.roundRect(-112, 386, 224, 62, 31);
+        graphics.fill();
+        this.addLabel(panel, 'HomeWardrobeTitle', '衣 橱', 32, Color.WHITE, new Vec3(0, 417), 300, 56, true);
+        this.homeCoinLabel = this.addLabel(
+            panel,
+            'HomeWardrobeCoins',
+            `金币 ${this.progress.coins}`,
+            18,
+            new Color(145, 93, 101, 255),
+            new Vec3(245, 356),
+            170,
+            34,
+            true,
+        );
+        this.homeWardrobeList = this.createNode('HomeWardrobeList', panel);
+        this.homeWardrobeList.getComponent(UITransform)?.setContentSize(600, 680);
+        this.renderHomeWardrobeList();
+        this.createButton(
+            panel,
+            'CloseHomeWardrobe',
+            '合上衣橱',
+            new Vec3(0, -408),
+            240,
+            54,
+            new Color(199, 172, 217, 255),
+            () => this.closeHomeWardrobe(),
+        );
+        this.homeWardrobeModal = modal;
+    }
+
+    private renderHomeWardrobeList(): void {
+        if (!this.homeWardrobeList?.isValid) {
+            return;
+        }
+        for (const child of [...this.homeWardrobeList.children]) {
+            child.destroy();
+        }
+        OUTFITS.forEach((outfit, index) => {
+            const owned = this.progress.ownedOutfits.indexOf(outfit.id) >= 0;
+            const equipped = this.progress.equippedOutfit === outfit.id;
+            const row = this.createNode(`HomeOutfit_${outfit.id}`, this.homeWardrobeList!);
+            row.setPosition(0, 260 - index * 112);
+            row.getComponent(UITransform)?.setContentSize(560, 94);
+            const graphics = row.addComponent(Graphics);
+            graphics.fillColor = equipped
+                ? new Color(outfit.accent.r, outfit.accent.g, outfit.accent.b, 75)
+                : new Color(255, 251, 250, 240);
+            graphics.strokeColor = equipped ? outfit.accent : new Color(237, 216, 229, 230);
+            graphics.lineWidth = equipped ? 4 : 2;
+            graphics.roundRect(-280, -47, 560, 94, 22);
+            graphics.fill();
+            graphics.stroke();
+            graphics.fillColor = outfit.accent;
+            graphics.circle(-234, 0, 24);
+            graphics.fill();
+            this.addLabel(row, 'OutfitName', outfit.name, 20, new Color(98, 63, 103, 255), new Vec3(-104, 18), 220, 30, true);
+            this.addLabel(
+                row,
+                'OutfitTags',
+                `${outfit.tags.join(' · ')}  ${outfit.bonusLabel}`,
+                14,
+                new Color(145, 102, 139, 230),
+                new Vec3(-104, -18),
+                230,
+                26,
+                true,
+            );
+            this.addLabel(
+                row,
+                'OutfitStatus',
+                equipped ? '穿戴中' : owned ? '点击穿戴' : `${outfit.price} 金币`,
+                16,
+                equipped ? new Color(180, 79, 136, 255) : new Color(125, 85, 126, 255),
+                new Vec3(190, 0),
+                130,
+                38,
+                true,
+            );
+            this.makeInteractive(row, () => this.chooseHomeOutfit(outfit));
+        });
+    }
+
+    private chooseHomeOutfit(outfit: OutfitDefinition): void {
+        const owned = this.progress.ownedOutfits.indexOf(outfit.id) >= 0;
+        if (!owned && this.progress.coins < outfit.price) {
+            this.showToast(`金币不足，还需要 ${outfit.price - this.progress.coins}`);
+            return;
+        }
+        if (!owned) {
+            this.progress = {
+                ...this.progress,
+                coins: this.progress.coins - outfit.price,
+                ownedOutfits: [...this.progress.ownedOutfits, outfit.id],
+                equippedOutfit: outfit.id,
+            };
+        } else {
+            this.progress = {
+                ...this.progress,
+                equippedOutfit: outfit.id,
+            };
+        }
+        saveProgress(this.progress);
+        if (this.homeCoinLabel?.isValid) {
+            this.homeCoinLabel.string = `金币 ${this.progress.coins}`;
+        }
+        this.renderHomeWardrobeList();
+        gameFeel.play('gift');
+        this.showToast(`已穿上 ${getOutfit(outfit.id).name}`);
+    }
+
+    private closeHomeWardrobe(): void {
+        if (this.homeWardrobeModal?.isValid) {
+            this.homeWardrobeModal.destroy();
+        }
+        this.homeWardrobeModal = null;
+        this.homeWardrobeList = null;
+        this.homeCoinLabel = null;
     }
 
     private createLayers(): void {
@@ -1363,7 +1939,9 @@ export class VenueInterior extends Component {
         if (this.toastNode?.isValid) {
             this.toastNode.destroy();
         }
-        const toastParent = this.dialogueModal?.isValid || this.surgeryModal?.isValid
+        const toastParent = this.dialogueModal?.isValid
+            || this.surgeryModal?.isValid
+            || this.homeWardrobeModal?.isValid
             ? this.modalLayer
             : this.feedbackLayer;
         const toast = this.createNode('VenueToast', toastParent);
@@ -1371,7 +1949,7 @@ export class VenueInterior extends Component {
         toast.getComponent(UITransform)?.setContentSize(520, 58);
         const graphics = toast.addComponent(Graphics);
         graphics.fillColor = new Color(255, 249, 253, 245);
-        graphics.strokeColor = this.venue.accent;
+        graphics.strokeColor = this.homeMode ? HOME_ACCENT : this.venue.accent;
         graphics.lineWidth = 2;
         graphics.roundRect(-260, -29, 520, 58, 29);
         graphics.fill();
