@@ -90,7 +90,122 @@ interface FlowerSpot {
     accent: Color;
 }
 
+interface IsometricBuildingDefinition {
+    name: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    body: Color;
+    roof: Color;
+    accent: Color;
+    sign: string;
+    style?: 'cafe' | 'innovation' | 'home' | 'stage';
+}
+
 type TaskView = 'jobs' | 'roles';
+
+const ISO_CITY_LEFT = -MAP_WIDTH / 2;
+const ISO_CITY_RIGHT = MAP_WIDTH / 2;
+const ISO_CITY_BOTTOM = -MAP_HEIGHT / 2;
+const ISO_CITY_TOP = MAP_HEIGHT / 2;
+const ISO_BUILDING_SKEW_X = 54;
+const ISO_BUILDING_DEPTH = 86;
+
+const CITY_ISO_BUILDINGS: IsometricBuildingDefinition[] = [
+    {
+        name: '花街咖啡馆',
+        x: -425,
+        y: 900,
+        width: 320,
+        height: 300,
+        body: new Color(255, 216, 229, 255),
+        roof: new Color(190, 128, 170, 255),
+        accent: new Color(231, 158, 170, 255),
+        sign: 'CAFE & FLOWERS',
+        style: 'cafe',
+    },
+    {
+        name: '星环创新中心',
+        x: 425,
+        y: 880,
+        width: 340,
+        height: 370,
+        body: new Color(224, 232, 250, 255),
+        roof: new Color(132, 149, 205, 255),
+        accent: new Color(110, 156, 217, 255),
+        sign: 'STAR RING',
+        style: 'innovation',
+    },
+    {
+        name: '月光书室',
+        x: -425,
+        y: 360,
+        width: 310,
+        height: 258,
+        body: new Color(237, 225, 250, 255),
+        roof: new Color(143, 124, 190, 255),
+        accent: new Color(145, 150, 220, 255),
+        sign: 'MOONLIGHT BOOKS',
+    },
+    {
+        name: '甜心商店',
+        x: 425,
+        y: 340,
+        width: 310,
+        height: 266,
+        body: new Color(255, 226, 235, 255),
+        roof: new Color(207, 126, 160, 255),
+        accent: new Color(246, 155, 181, 255),
+        sign: 'SWEET HEART',
+    },
+    {
+        name: '仁心医院',
+        x: -425,
+        y: -170,
+        width: 310,
+        height: 230,
+        body: new Color(226, 246, 244, 255),
+        roof: new Color(125, 179, 183, 255),
+        accent: new Color(127, 190, 190, 255),
+        sign: 'KIND HEART',
+    },
+    {
+        name: '夜轨赛车工坊',
+        x: 425,
+        y: -210,
+        width: 310,
+        height: 230,
+        body: new Color(245, 225, 229, 255),
+        roof: new Color(145, 119, 132, 255),
+        accent: new Color(218, 107, 119, 255),
+        sign: 'NIGHT RAIL',
+    },
+    {
+        name: '花语公寓',
+        x: -425,
+        y: -790,
+        width: 330,
+        height: 350,
+        body: new Color(244, 218, 241, 255),
+        roof: new Color(162, 120, 180, 255),
+        accent: new Color(203, 142, 194, 255),
+        sign: 'FLOWER HOME',
+        style: 'home',
+    },
+    {
+        name: '星屑剧场',
+        x: 425,
+        y: -800,
+        width: 330,
+        height: 360,
+        body: new Color(255, 219, 234, 255),
+        roof: new Color(194, 124, 171, 255),
+        accent: new Color(164, 143, 226, 255),
+        sign: 'STARDUST THEATRE',
+        style: 'stage',
+    },
+];
 
 const CITY_JOBS: CityJob[] = [
     {
@@ -139,8 +254,8 @@ export class CityExplore extends Component {
     private worldRoot!: Node;
     private buildingLayer!: Node;
     private decorationLayer!: Node;
+    private isoDepthLayer!: Node;
     private characterLayer!: Node;
-    private maleNpcLayer!: Node;
     private hudLayer!: Node;
     private feedbackLayer!: Node;
     private modalLayer!: Node;
@@ -164,16 +279,14 @@ export class CityExplore extends Component {
     private jobStopLabel: Label | null = null;
     private jobCoinLabel: Label | null = null;
     private playerOutfitAccessory: Node | null = null;
-    private wardrobeButton!: Node;
     private wardrobeModal: Node | null = null;
     private wardrobeList: Node | null = null;
     private wardrobeCoinLabel: Label | null = null;
     private wardrobeMessageLabel: Label | null = null;
     private wardrobePreviewVisual: Node | null = null;
     private wardrobePreviewCaption: Label | null = null;
-    private partnerButton!: Node;
-    private partnerButtonLabel!: Label;
-    private taskButtonLabel!: Label;
+    private menuBadge: Node | null = null;
+    private menuBadgeLabel: Label | null = null;
     private charmLabel!: Label;
     private partnerModal: Node | null = null;
     private taskModal: Node | null = null;
@@ -185,6 +298,7 @@ export class CityExplore extends Component {
     private beautyContent: Node | null = null;
     private beautyCharmLabel: Label | null = null;
     private maleDialogueModal: Node | null = null;
+    private cityMenuModal: Node | null = null;
     private partnerList: Node | null = null;
     private partnerPageLabel: Label | null = null;
     private partnerActiveLabel: Label | null = null;
@@ -202,6 +316,8 @@ export class CityExplore extends Component {
     private keyboard = new Set<KeyCode>();
     private joystickDirection = new Vec3();
     private collisions: CollisionBox[] = [];
+    private isoDepthNodes: Node[] = [];
+    private maleNpcNodes: Node[] = [];
     private lastLocation = '';
 
     protected start(): void {
@@ -214,6 +330,7 @@ export class CityExplore extends Component {
         this.createLayers();
         this.createWorld();
         this.createPlayer();
+        this.createMaleNpcs();
         this.createHud();
         this.bindKeyboard();
         this.updateCamera();
@@ -277,6 +394,7 @@ export class CityExplore extends Component {
             this.playerVisual.setScale(new Vec3(direction.x < -0.05 ? -1 : 1, 1, 1));
         }
         this.updateCamera();
+        this.updateCityDepthPresentation();
         this.updateLocation();
     }
 
@@ -284,8 +402,8 @@ export class CityExplore extends Component {
         this.worldRoot = this.createLayer('WorldRoot');
         this.decorationLayer = this.createLayer('CityDecorationLayer', this.worldRoot);
         this.buildingLayer = this.createLayer('BuildingLayer', this.worldRoot);
+        this.isoDepthLayer = this.createLayer('CityDepthLayer', this.worldRoot);
         this.characterLayer = this.createLayer('CharacterLayer', this.worldRoot);
-        this.maleNpcLayer = this.createLayer('MaleNpcLayer', this.characterLayer);
         this.hudLayer = this.createLayer('HudLayer');
         this.feedbackLayer = this.createLayer('FeedbackLayer');
         this.modalLayer = this.createLayer('ModalLayer');
@@ -336,9 +454,11 @@ export class CityExplore extends Component {
         graphics.fill();
 
         this.createRoadDetails();
+        this.createIsometricCityDistrict();
         this.createBuildings();
         this.createFountain(0, 420);
         this.createTrees();
+        this.createIsometricStreetProps();
         this.createJobMarkers();
         this.createVenueMarkers();
         this.createFlowerPickups();
@@ -364,105 +484,385 @@ export class CityExplore extends Component {
         graphics.stroke();
     }
 
-    private createBuildings(): void {
-        const buildings = [
-            { name: '花街咖啡馆', x: -610, y: 870, w: 350, h: 360, body: new Color(255, 205, 224), roof: new Color(190, 128, 170), sign: 'CAFE' },
-            { name: '星环创新中心', x: 585, y: 850, w: 360, h: 430, body: new Color(220, 228, 248), roof: new Color(132, 149, 205), sign: 'INNOVATE' },
-            { name: '月光书室', x: -590, y: 360, w: 340, h: 310, body: new Color(230, 216, 250), roof: new Color(142, 124, 187), sign: 'BOOKS' },
-            { name: '甜心商店', x: 590, y: 340, w: 340, h: 320, body: new Color(255, 218, 225), roof: new Color(204, 124, 159), sign: 'SWEET' },
-            { name: '仁心医院', x: -590, y: -170, w: 340, h: 250, body: new Color(220, 244, 241), roof: new Color(125, 179, 183), sign: 'CLINIC' },
-            { name: '夜轨赛车工坊', x: 590, y: -210, w: 340, h: 250, body: new Color(239, 219, 221), roof: new Color(144, 119, 130), sign: 'SPEED' },
-            { name: '花语公寓', x: -600, y: -760, w: 350, h: 390, body: new Color(240, 211, 239), roof: new Color(162, 120, 180), sign: 'HOME' },
-            { name: '星屑剧场', x: 590, y: -780, w: 350, h: 390, body: new Color(252, 214, 230), roof: new Color(194, 124, 171), sign: 'STAGE' },
-        ];
-        buildings.forEach((building) => {
-            this.createBuilding(building);
-        });
-    }
+    private createIsometricCityDistrict(): void {
+        const surface = this.createNode('IsometricCitySurface', this.decorationLayer);
+        surface.getComponent(UITransform)?.setContentSize(
+            ISO_CITY_RIGHT - ISO_CITY_LEFT,
+            ISO_CITY_TOP - ISO_CITY_BOTTOM,
+        );
+        const graphics = surface.addComponent(Graphics);
 
-    private createBuilding(config: {
-        name: string;
-        x: number;
-        y: number;
-        w: number;
-        h: number;
-        body: Color;
-        roof: Color;
-        sign: string;
-    }): void {
-        const building = this.createNode(config.name, this.buildingLayer);
-        building.setPosition(config.x, config.y);
-        building.getComponent(UITransform)?.setContentSize(config.w, config.h);
-        const graphics = building.addComponent(Graphics);
+        graphics.fillColor = new Color(248, 218, 234, 255);
+        graphics.rect(
+            ISO_CITY_LEFT,
+            ISO_CITY_BOTTOM,
+            ISO_CITY_RIGHT - ISO_CITY_LEFT,
+            ISO_CITY_TOP - ISO_CITY_BOTTOM,
+        );
+        graphics.fill();
 
-        graphics.fillColor = new Color(87, 61, 83, 45);
-        graphics.roundRect(-config.w / 2 + 12, -config.h / 2 - 18, config.w, config.h, 24);
+        graphics.fillColor = new Color(255, 236, 245, 235);
+        graphics.ellipse(0, 900, 640, 230);
+        graphics.ellipse(0, -820, 660, 250);
         graphics.fill();
-        graphics.fillColor = config.body;
-        graphics.strokeColor = new Color(255, 248, 253, 230);
-        graphics.lineWidth = 5;
-        graphics.roundRect(-config.w / 2, -config.h / 2, config.w, config.h, 24);
+
+        graphics.fillColor = new Color(255, 232, 241, 255);
+        graphics.moveTo(-310, ISO_CITY_BOTTOM);
+        graphics.lineTo(310, ISO_CITY_BOTTOM);
+        graphics.lineTo(230, ISO_CITY_TOP);
+        graphics.lineTo(-230, ISO_CITY_TOP);
+        graphics.close();
         graphics.fill();
+
+        graphics.fillColor = new Color(229, 210, 231, 255);
+        graphics.moveTo(-500, ISO_CITY_BOTTOM);
+        graphics.lineTo(-310, ISO_CITY_BOTTOM);
+        graphics.lineTo(-230, ISO_CITY_TOP);
+        graphics.lineTo(-430, ISO_CITY_TOP);
+        graphics.close();
+        graphics.fill();
+        graphics.moveTo(310, ISO_CITY_BOTTOM);
+        graphics.lineTo(500, ISO_CITY_BOTTOM);
+        graphics.lineTo(430, ISO_CITY_TOP);
+        graphics.lineTo(230, ISO_CITY_TOP);
+        graphics.close();
+        graphics.fill();
+
+        graphics.fillColor = new Color(247, 236, 247, 255);
+        graphics.rect(-126, ISO_CITY_BOTTOM, 252, ISO_CITY_TOP - ISO_CITY_BOTTOM);
+        graphics.fill();
+
+        graphics.strokeColor = new Color(255, 250, 252, 190);
+        graphics.lineWidth = 4;
+        for (let index = 0; index < 31; index += 1) {
+            const topRatio = index / 30;
+            const y = ISO_CITY_BOTTOM + topRatio * (ISO_CITY_TOP - ISO_CITY_BOTTOM);
+            const halfWidth = 300 - topRatio * 72;
+            graphics.moveTo(-halfWidth, y);
+            graphics.lineTo(halfWidth, y);
+        }
         graphics.stroke();
 
-        graphics.fillColor = config.roof;
-        graphics.roundRect(-config.w / 2, config.h / 2 - 78, config.w, 78, 24);
+        graphics.strokeColor = new Color(221, 174, 210, 150);
+        graphics.lineWidth = 2;
+        for (let index = -3; index <= 3; index += 1) {
+            graphics.moveTo(index * 72, ISO_CITY_BOTTOM);
+            graphics.lineTo(index * 54, ISO_CITY_TOP);
+        }
+        graphics.stroke();
+
+        graphics.fillColor = new Color(255, 225, 236, 255);
+        graphics.ellipse(0, 420, 390, 190);
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 247, 250, 245);
+        graphics.lineWidth = 8;
+        graphics.ellipse(0, 420, 360, 166);
+        graphics.stroke();
+        graphics.strokeColor = new Color(221, 166, 203, 220);
+        graphics.lineWidth = 4;
+        graphics.ellipse(0, 420, 325, 141);
+        graphics.stroke();
+
+        graphics.strokeColor = new Color(255, 255, 255, 170);
+        graphics.lineWidth = 3;
+        graphics.ellipse(0, 420, 292, 118);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(255, 244, 249, 245);
+        graphics.moveTo(-390, 420);
+        graphics.lineTo(-500, 230);
+        graphics.lineTo(-500, 610);
+        graphics.close();
+        graphics.fill();
+        graphics.moveTo(390, 420);
+        graphics.lineTo(500, 610);
+        graphics.lineTo(500, 230);
+        graphics.close();
         graphics.fill();
 
-        const windowColor = new Color(255, 246, 196, 245);
-        graphics.fillColor = windowColor;
-        for (let column = 0; column < 3; column += 1) {
-            for (let row = 0; row < Math.max(1, Math.floor((config.h - 150) / 95)); row += 1) {
-                graphics.roundRect(
-                    -config.w / 2 + 44 + column * (config.w - 88) / 3,
-                    config.h / 2 - 160 - row * 92,
-                    (config.w - 140) / 3,
-                    48,
-                    10,
-                );
+        graphics.strokeColor = new Color(255, 248, 252, 210);
+        graphics.lineWidth = 5;
+        graphics.ellipse(0, 900, 560, 178);
+        graphics.ellipse(0, -820, 580, 198);
+        graphics.stroke();
+        graphics.strokeColor = new Color(222, 173, 209, 165);
+        graphics.lineWidth = 3;
+        graphics.ellipse(0, 900, 515, 148);
+        graphics.ellipse(0, -820, 535, 166);
+        graphics.stroke();
+    }
+
+    private createIsometricBuilding(config: IsometricBuildingDefinition): void {
+        const building = this.createNode(config.name, this.isoDepthLayer);
+        building.setPosition(config.x, config.y);
+        building.getComponent(UITransform)?.setContentSize(
+            config.width + ISO_BUILDING_SKEW_X + 40,
+            config.height + ISO_BUILDING_DEPTH + 70,
+        );
+        const graphics = building.addComponent(Graphics);
+        const halfWidth = config.width / 2;
+        const sideColor = new Color(
+            Math.round(config.body.r * 0.72),
+            Math.round(config.body.g * 0.72),
+            Math.round(config.body.b * 0.72),
+            255,
+        );
+        const roofShade = new Color(
+            Math.round(config.roof.r * 0.82),
+            Math.round(config.roof.g * 0.82),
+            Math.round(config.roof.b * 0.82),
+            255,
+        );
+
+        graphics.fillColor = new Color(75, 54, 74, 70);
+        graphics.ellipse(18, -16, config.width * 0.58, 30);
+        graphics.fill();
+
+        graphics.fillColor = sideColor;
+        graphics.moveTo(halfWidth, 0);
+        graphics.lineTo(halfWidth + ISO_BUILDING_SKEW_X, ISO_BUILDING_DEPTH);
+        graphics.lineTo(
+            halfWidth + ISO_BUILDING_SKEW_X,
+            config.height + ISO_BUILDING_DEPTH,
+        );
+        graphics.lineTo(halfWidth, config.height);
+        graphics.close();
+        graphics.fill();
+
+        graphics.strokeColor = new Color(255, 252, 253, 210);
+        graphics.lineWidth = 4;
+        const sideWindowRows = Math.max(1, Math.floor((config.height - 72) / 86));
+        for (let row = 0; row < sideWindowRows; row += 1) {
+            const y = 36 + row * 82;
+            graphics.fillColor = new Color(255, 236, 176, 230);
+            graphics.moveTo(halfWidth + 17, y);
+            graphics.lineTo(halfWidth + ISO_BUILDING_SKEW_X - 12, y + 24);
+            graphics.lineTo(halfWidth + ISO_BUILDING_SKEW_X - 12, y + 60);
+            graphics.lineTo(halfWidth + 17, y + 38);
+            graphics.close();
+            graphics.fill();
+        }
+
+        graphics.fillColor = config.roof;
+        graphics.moveTo(-halfWidth, config.height);
+        graphics.lineTo(halfWidth, config.height);
+        graphics.lineTo(
+            halfWidth + ISO_BUILDING_SKEW_X,
+            config.height + ISO_BUILDING_DEPTH,
+        );
+        graphics.lineTo(
+            -halfWidth + ISO_BUILDING_SKEW_X,
+            config.height + ISO_BUILDING_DEPTH,
+        );
+        graphics.close();
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 250, 253, 220);
+        graphics.lineWidth = 4;
+        graphics.stroke();
+
+        graphics.fillColor = roofShade;
+        graphics.moveTo(-halfWidth + 10, config.height + 10);
+        graphics.lineTo(halfWidth - 10, config.height + 10);
+        graphics.lineTo(
+            halfWidth + ISO_BUILDING_SKEW_X - 20,
+            config.height + ISO_BUILDING_DEPTH - 12,
+        );
+        graphics.lineTo(
+            -halfWidth + ISO_BUILDING_SKEW_X + 20,
+            config.height + ISO_BUILDING_DEPTH - 12,
+        );
+        graphics.close();
+        graphics.fill();
+
+        graphics.strokeColor = new Color(255, 247, 252, 145);
+        graphics.lineWidth = 3;
+        for (let index = 1; index <= 3; index += 1) {
+            const ratio = index / 4;
+            graphics.moveTo(
+                -halfWidth + ISO_BUILDING_SKEW_X * ratio,
+                config.height + ISO_BUILDING_DEPTH * ratio,
+            );
+            graphics.lineTo(
+                halfWidth + ISO_BUILDING_SKEW_X * ratio,
+                config.height + ISO_BUILDING_DEPTH * ratio,
+            );
+        }
+        graphics.stroke();
+
+        graphics.fillColor = config.body;
+        graphics.roundRect(-halfWidth, 0, config.width, config.height, 18);
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 253, 254, 235);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-halfWidth, 0, config.width, config.height, 18);
+        graphics.stroke();
+
+        const windowFill = config.style === 'innovation'
+            ? new Color(181, 232, 255, 250)
+            : config.style === 'stage'
+                ? new Color(255, 222, 240, 250)
+                : new Color(255, 243, 190, 250);
+        const windowCount = 3;
+        const windowWidth = 56;
+        const windowGap = 20;
+        const windowsWidth = windowCount * windowWidth + (windowCount - 1) * windowGap;
+        const windowStart = -windowsWidth / 2;
+        const windowRows = config.height >= 300 ? 2 : 1;
+        for (let row = 0; row < windowRows; row += 1) {
+            for (let index = 0; index < windowCount; index += 1) {
+                const x = windowStart + index * (windowWidth + windowGap);
+                const y = 88 + row * 80;
+                graphics.fillColor = windowFill;
+                graphics.roundRect(x, y, windowWidth, 64, 14);
+                graphics.fill();
+                graphics.strokeColor = config.accent;
+                graphics.lineWidth = 3;
+                graphics.roundRect(x, y, windowWidth, 64, 14);
+                graphics.stroke();
+                graphics.strokeColor = new Color(255, 255, 255, 180);
+                graphics.lineWidth = 2;
+                graphics.moveTo(x + windowWidth / 2, y + 6);
+                graphics.lineTo(x + windowWidth / 2, y + 58);
+                graphics.moveTo(x + 8, y + 32);
+                graphics.lineTo(x + windowWidth - 8, y + 32);
+                graphics.stroke();
             }
         }
+
+        graphics.fillColor = config.accent;
+        graphics.roundRect(-halfWidth + 18, 75, config.width - 36, 22, 10);
+        graphics.fill();
+        for (let index = 0; index < 8; index += 1) {
+            graphics.fillColor = index % 2 === 0
+                ? new Color(255, 248, 251, 235)
+                : config.accent;
+            graphics.roundRect(
+                -halfWidth + 32 + index * (config.width - 64) / 8,
+                75,
+                (config.width - 64) / 16,
+                22,
+                6,
+            );
+            graphics.fill();
+        }
+
+        if (config.style === 'home') {
+            graphics.fillColor = new Color(181, 128, 181, 220);
+            graphics.roundRect(-halfWidth + 18, 158, config.width - 36, 10, 5);
+            graphics.roundRect(-halfWidth + 18, 238, config.width - 36, 10, 5);
+            graphics.fill();
+            for (let index = 0; index < 9; index += 1) {
+                graphics.fillColor = index % 2 === 0
+                    ? new Color(255, 165, 201, 240)
+                    : new Color(255, 232, 241, 240);
+                graphics.circle(
+                    -halfWidth + 38 + index * (config.width - 76) / 8,
+                    254,
+                    7,
+                );
+                graphics.fill();
+            }
+        } else if (config.style === 'innovation') {
+            graphics.fillColor = new Color(95, 170, 226, 70);
+            graphics.roundRect(-halfWidth + 20, 82, config.width - 40, config.height - 158, 18);
+            graphics.fill();
+            graphics.strokeColor = new Color(182, 234, 255, 230);
+            graphics.lineWidth = 3;
+            graphics.moveTo(-halfWidth + 22, config.height - 86);
+            graphics.lineTo(halfWidth - 22, config.height - 86);
+            graphics.stroke();
+        } else if (config.style === 'stage') {
+            graphics.fillColor = config.accent;
+            graphics.moveTo(-halfWidth, config.height - 10);
+            graphics.lineTo(-halfWidth + 24, config.height - 104);
+            graphics.lineTo(-halfWidth + 24, config.height - 10);
+            graphics.close();
+            graphics.fill();
+            graphics.moveTo(halfWidth, config.height - 10);
+            graphics.lineTo(halfWidth - 24, config.height - 104);
+            graphics.lineTo(halfWidth - 24, config.height - 10);
+            graphics.close();
+            graphics.fill();
+            for (let index = 0; index < 9; index += 1) {
+                graphics.fillColor = new Color(255, 236, 157, 250);
+                graphics.circle(
+                    -halfWidth + 24 + index * (config.width - 48) / 8,
+                    config.height - 68,
+                    5,
+                );
+                graphics.fill();
+            }
+        } else if (config.style === 'cafe') {
+            graphics.fillColor = new Color(255, 250, 245, 220);
+            graphics.roundRect(-halfWidth + 20, 61, config.width - 40, 8, 4);
+            graphics.fill();
+        }
+
+        graphics.fillColor = new Color(101, 70, 105, 250);
+        graphics.roundRect(-42, 8, 84, 76, 12);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 225, 171, 235);
+        graphics.roundRect(-31, 20, 62, 48, 8);
+        graphics.fill();
+        graphics.fillColor = new Color(105, 72, 108, 220);
+        graphics.circle(0, 45, 5);
         graphics.fill();
 
-        graphics.fillColor = new Color(114, 76, 108, 245);
-        graphics.roundRect(-42, -config.h / 2 + 20, 84, 110, 12);
+        graphics.fillColor = new Color(88, 59, 91, 225);
+        graphics.roundRect(-halfWidth + 22, config.height - 62, config.width - 44, 42, 16);
         graphics.fill();
-        graphics.fillColor = new Color(255, 231, 241, 250);
-        graphics.roundRect(-config.w / 2 + 24, config.h / 2 - 64, config.w - 48, 42, 18);
+        graphics.strokeColor = new Color(255, 247, 252, 210);
+        graphics.lineWidth = 2;
+        graphics.roundRect(-halfWidth + 22, config.height - 62, config.width - 44, 42, 16);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(255, 237, 246, 245);
+        graphics.roundRect(-104, config.height + ISO_BUILDING_DEPTH + 8, 208, 34, 15);
         graphics.fill();
 
-        this.addLabel(
-            building,
-            'ShopSign',
-            config.sign,
-            18,
-            new Color(120, 73, 116, 255),
-            new Vec3(0, config.h / 2 - 43),
-            config.w - 70,
-            32,
-            true,
-        );
         this.addLabel(
             building,
             'BuildingName',
             config.name,
-            22,
+            20,
             Color.WHITE,
-            new Vec3(0, -config.h / 2 + 145),
-            config.w - 44,
-            40,
+            new Vec3(0, config.height - 41),
+            config.width - 64,
+            34,
+            true,
+        );
+        this.addLabel(
+            building,
+            'RoofSign',
+            config.sign,
+            14,
+            new Color(108, 72, 113, 255),
+            new Vec3(0, config.height + ISO_BUILDING_DEPTH + 25),
+            188,
+            26,
             true,
         );
 
+        this.registerIsoDepth(building);
         this.collisions.push({
-            left: config.x - config.w / 2,
-            right: config.x + config.w / 2,
-            bottom: config.y - config.h / 2,
-            top: config.y + config.h / 2,
+            left: config.x - halfWidth,
+            right: config.x + halfWidth + ISO_BUILDING_SKEW_X,
+            bottom: config.y + 8,
+            top: config.y + ISO_BUILDING_DEPTH + 12,
+        });
+    }
+
+    private createBuildings(): void {
+        CITY_ISO_BUILDINGS.forEach((building) => {
+            this.createIsometricBuilding(building);
         });
     }
 
     private createFountain(x: number, y: number): void {
+        if (this.isInIsometricCity(x, y)) {
+            this.createIsometricFountain(x, y);
+            return;
+        }
         const fountain = this.createNode('SakuraFountain', this.decorationLayer);
         fountain.setPosition(x, y);
         const graphics = fountain.addComponent(Graphics);
@@ -498,6 +898,103 @@ export class CityExplore extends Component {
         });
     }
 
+    private createIsometricFountain(x: number, y: number): void {
+        const fountain = this.createNode('SakuraFountain2_5D', this.isoDepthLayer);
+        fountain.setPosition(x, y);
+        fountain.getComponent(UITransform)?.setContentSize(450, 390);
+        const graphics = fountain.addComponent(Graphics);
+
+        graphics.fillColor = new Color(89, 64, 88, 65);
+        graphics.ellipse(16, -14, 242, 92);
+        graphics.fill();
+
+        graphics.fillColor = new Color(199, 139, 182, 255);
+        graphics.moveTo(-176, -8);
+        graphics.lineTo(176, -8);
+        graphics.lineTo(150, 34);
+        graphics.lineTo(-150, 34);
+        graphics.close();
+        graphics.fill();
+
+        graphics.fillColor = new Color(255, 231, 243, 255);
+        graphics.ellipse(0, 27, 184, 74);
+        graphics.fill();
+        graphics.strokeColor = new Color(209, 145, 192, 255);
+        graphics.lineWidth = 8;
+        graphics.ellipse(0, 27, 184, 74);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(137, 199, 239, 250);
+        graphics.ellipse(0, 36, 148, 54);
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 255, 255, 230);
+        graphics.lineWidth = 4;
+        graphics.ellipse(0, 40, 112, 35);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(255, 231, 243, 255);
+        graphics.roundRect(-34, 34, 68, 58, 16);
+        graphics.fill();
+        graphics.fillColor = new Color(218, 159, 201, 255);
+        graphics.roundRect(-24, 82, 48, 94, 13);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 238, 247, 255);
+        graphics.roundRect(-50, 158, 100, 24, 12);
+        graphics.fill();
+        graphics.fillColor = new Color(217, 160, 204, 255);
+        graphics.roundRect(-18, 174, 36, 66, 11);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 244, 249, 255);
+        graphics.circle(0, 244, 28);
+        graphics.fill();
+
+        graphics.strokeColor = new Color(177, 225, 246, 245);
+        graphics.lineWidth = 6;
+        graphics.moveTo(-12, 230);
+        graphics.bezierCurveTo(-62, 194, -92, 126, -85, 68);
+        graphics.moveTo(12, 230);
+        graphics.bezierCurveTo(62, 194, 92, 126, 85, 68);
+        graphics.stroke();
+        graphics.fillColor = new Color(202, 235, 249, 120);
+        graphics.circle(-85, 66, 14);
+        graphics.circle(85, 66, 14);
+        graphics.fill();
+
+        for (let index = 0; index < 12; index += 1) {
+            const angle = Math.PI * 2 * index / 12;
+            const radiusX = 154 + (index % 3) * 12;
+            graphics.fillColor = index % 2 === 0
+                ? new Color(255, 148, 191, 235)
+                : new Color(230, 183, 245, 225);
+            graphics.ellipse(
+                Math.cos(angle) * radiusX,
+                36 + Math.sin(angle) * 55,
+                10,
+                5,
+            );
+            graphics.fill();
+        }
+
+        this.addLabel(
+            fountain,
+            'FountainLabel',
+            '樱花喷泉',
+            19,
+            new Color(111, 77, 119, 245),
+            new Vec3(0, -55),
+            190,
+            34,
+            true,
+        );
+        this.registerIsoDepth(fountain);
+        this.collisions.push({
+            left: x - 145,
+            right: x + 145,
+            bottom: y - 42,
+            top: y + 70,
+        });
+    }
+
     private createTrees(): void {
         const points = [
             new Vec3(-315, 1180), new Vec3(315, 1160),
@@ -507,6 +1004,10 @@ export class CityExplore extends Component {
             new Vec3(-315, -1190), new Vec3(315, -1210),
         ];
         for (const point of points) {
+            if (this.isInIsometricCity(point.x, point.y)) {
+                this.createIsometricTree(point);
+                continue;
+            }
             const tree = this.createNode('SakuraTree', this.decorationLayer);
             tree.setPosition(point);
             const graphics = tree.addComponent(Graphics);
@@ -524,9 +1025,161 @@ export class CityExplore extends Component {
         }
     }
 
+    private createIsometricTree(point: Vec3): void {
+        const tree = this.createNode('SakuraTree2_5D', this.isoDepthLayer);
+        tree.setPosition(point);
+        tree.getComponent(UITransform)?.setContentSize(210, 300);
+        const graphics = tree.addComponent(Graphics);
+
+        graphics.fillColor = new Color(86, 62, 86, 55);
+        graphics.ellipse(14, -5, 95, 30);
+        graphics.fill();
+
+        graphics.fillColor = new Color(121, 82, 111, 255);
+        graphics.moveTo(-9, 0);
+        graphics.lineTo(12, 0);
+        graphics.lineTo(24, 92);
+        graphics.lineTo(2, 104);
+        graphics.close();
+        graphics.fill();
+        graphics.strokeColor = new Color(238, 171, 197, 190);
+        graphics.lineWidth = 3;
+        graphics.moveTo(3, 12);
+        graphics.lineTo(14, 84);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(210, 127, 175, 245);
+        graphics.circle(-28, 114, 54);
+        graphics.circle(34, 124, 60);
+        graphics.circle(4, 164, 56);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 166, 204, 250);
+        graphics.circle(-43, 140, 40);
+        graphics.circle(20, 151, 47);
+        graphics.circle(62, 110, 33);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 216, 234, 245);
+        graphics.circle(-14, 176, 24);
+        graphics.circle(48, 146, 18);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 246, 251, 220);
+        graphics.circle(-28, 188, 10);
+        graphics.circle(59, 158, 8);
+        graphics.fill();
+
+        for (let index = 0; index < 7; index += 1) {
+            graphics.fillColor = new Color(255, 173, 207, 215);
+            graphics.circle(
+                -88 + (index * 37) % 178,
+                96 + (index * 29) % 112,
+                3 + index % 3,
+            );
+            graphics.fill();
+        }
+        this.registerIsoDepth(tree);
+    }
+
+    private createIsometricStreetProps(): void {
+        const sign = this.createNode('CentralFountainDistrictSign', this.isoDepthLayer);
+        sign.setPosition(0, -585);
+        sign.getComponent(UITransform)?.setContentSize(390, 230);
+        const graphics = sign.addComponent(Graphics);
+
+        graphics.fillColor = new Color(89, 59, 93, 65);
+        graphics.ellipse(0, -5, 170, 24);
+        graphics.fill();
+        graphics.fillColor = new Color(134, 91, 133, 255);
+        graphics.roundRect(-143, 0, 18, 118, 8);
+        graphics.roundRect(125, 0, 18, 118, 8);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 237, 246, 255);
+        graphics.strokeColor = new Color(206, 132, 184, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-172, 102, 344, 92, 26);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(250, 169, 205, 255);
+        graphics.roundRect(-153, 118, 306, 60, 18);
+        graphics.fill();
+        graphics.fillColor = new Color(120, 76, 126, 255);
+        graphics.circle(-116, 109, 8);
+        graphics.circle(116, 109, 8);
+        graphics.fill();
+
+        this.addLabel(
+            sign,
+            'DistrictSignTitle',
+            '中央喷泉街',
+            25,
+            Color.WHITE,
+            new Vec3(0, 153),
+            270,
+            36,
+            true,
+        );
+        this.addLabel(
+            sign,
+            'DistrictSignSubtitle',
+            'SAKURA CITY · 2.5D',
+            13,
+            new Color(123, 76, 128, 255),
+            new Vec3(0, 127),
+            260,
+            24,
+            true,
+        );
+        this.registerIsoDepth(sign);
+
+        const lampPoints = [
+            new Vec3(-270, 1050),
+            new Vec3(270, 1030),
+            new Vec3(-270, 850),
+            new Vec3(270, 820),
+            new Vec3(-318, 60),
+            new Vec3(318, 20),
+            new Vec3(-318, -350),
+            new Vec3(318, -390),
+            new Vec3(-318, -560),
+            new Vec3(318, -600),
+            new Vec3(-285, -780),
+            new Vec3(285, -810),
+            new Vec3(-285, -1000),
+            new Vec3(285, -1030),
+            new Vec3(-285, -1200),
+            new Vec3(285, -1230),
+        ];
+        lampPoints.forEach((point, index) => {
+            const lamp = this.createNode(`IsoStreetLamp_${index}`, this.isoDepthLayer);
+            lamp.setPosition(point);
+            lamp.getComponent(UITransform)?.setContentSize(120, 230);
+            const lampGraphics = lamp.addComponent(Graphics);
+            lampGraphics.fillColor = new Color(255, 231, 174, 38);
+            lampGraphics.circle(0, 132, 60);
+            lampGraphics.fill();
+            lampGraphics.fillColor = new Color(102, 72, 108, 245);
+            lampGraphics.roundRect(-4, 0, 8, 116, 4);
+            lampGraphics.fill();
+            lampGraphics.fillColor = new Color(255, 232, 167, 255);
+            lampGraphics.roundRect(-20, 106, 40, 44, 12);
+            lampGraphics.fill();
+            lampGraphics.strokeColor = new Color(111, 76, 113, 240);
+            lampGraphics.lineWidth = 4;
+            lampGraphics.roundRect(-20, 106, 40, 44, 12);
+            lampGraphics.stroke();
+            lampGraphics.fillColor = new Color(255, 248, 214, 255);
+            lampGraphics.circle(0, 128, 10);
+            lampGraphics.fill();
+            this.registerIsoDepth(lamp);
+        });
+    }
+
     private createJobMarkers(): void {
         for (const job of CITY_JOBS) {
-            const marker = this.createNode(`JobMarker_${job.id}`, this.decorationLayer);
+            const inIsoDistrict = this.isInIsometricCity(job.x, job.y);
+            const marker = this.createNode(
+                `JobMarker_${job.id}`,
+                inIsoDistrict ? this.isoDepthLayer : this.decorationLayer,
+            );
             marker.setPosition(job.x, job.y);
             const graphics = marker.addComponent(Graphics);
             graphics.fillColor = new Color(job.accent.r, job.accent.g, job.accent.b, 225);
@@ -557,12 +1210,22 @@ export class CityExplore extends Component {
                 30,
                 true,
             );
+            if (inIsoDistrict) {
+                this.registerIsoDepth(marker);
+            }
         }
     }
 
     private createVenueMarkers(): void {
         for (const venue of VENUES) {
-            const marker = this.createNode(`VenueEntrance_${venue.id}`, this.decorationLayer);
+            const inIsoDistrict = this.isInIsometricCity(
+                venue.entranceX,
+                venue.entranceY,
+            );
+            const marker = this.createNode(
+                `VenueEntrance_${venue.id}`,
+                inIsoDistrict ? this.isoDepthLayer : this.decorationLayer,
+            );
             marker.setPosition(venue.entranceX, venue.entranceY);
             marker.getComponent(UITransform)?.setContentSize(150, 110);
             const graphics = marker.addComponent(Graphics);
@@ -602,6 +1265,9 @@ export class CityExplore extends Component {
                 32,
                 true,
             );
+            if (inIsoDistrict) {
+                this.registerIsoDepth(marker);
+            }
         }
     }
 
@@ -610,7 +1276,11 @@ export class CityExplore extends Component {
             if (this.progress.gatheredFlowers.indexOf(flower.id) >= 0) {
                 continue;
             }
-            const node = this.createNode(`FlowerPickup_${flower.id}`, this.decorationLayer);
+            const inIsoDistrict = this.isInIsometricCity(flower.x, flower.y);
+            const node = this.createNode(
+                `FlowerPickup_${flower.id}`,
+                inIsoDistrict ? this.isoDepthLayer : this.decorationLayer,
+            );
             node.setPosition(flower.x, flower.y);
             node.getComponent(UITransform)?.setContentSize(90, 104);
             const graphics = node.addComponent(Graphics);
@@ -647,6 +1317,9 @@ export class CityExplore extends Component {
                 true,
             );
             this.makeInteractive(node, () => this.pickFlower(flower, node));
+            if (inIsoDistrict) {
+                this.registerIsoDepth(node);
+            }
         }
     }
 
@@ -676,7 +1349,7 @@ export class CityExplore extends Component {
     }
 
     private createPlayer(): void {
-        this.player = this.createNode('Player', this.characterLayer);
+        this.player = this.createNode('Player', this.isoDepthLayer);
         this.player.setPosition(0, -760);
         this.player.getComponent(UITransform)?.setContentSize(PLAYER_RADIUS * 2, PLAYER_RADIUS * 2);
 
@@ -712,12 +1385,17 @@ export class CityExplore extends Component {
                     .to(0.8, { position: new Vec3(0, 16, 0) }, { easing: 'sineInOut' }),
             )
             .start();
+        this.registerIsoDepth(this.player);
+        this.updateCityDepthPresentation();
     }
 
     private createMaleNpcs(): void {
-        for (const child of [...this.maleNpcLayer.children]) {
-            child.destroy();
+        for (const node of this.maleNpcNodes) {
+            if (node.isValid) {
+                node.destroy();
+            }
         }
+        this.maleNpcNodes = [];
         const partners = this.getUnlockedPartners().slice(0, 6);
         const positions = [
             new Vec3(-145, -565),
@@ -729,7 +1407,7 @@ export class CityExplore extends Component {
         ];
 
         partners.forEach((partner, index) => {
-            const npc = this.createNode(`MaleNpc_${partner.id}`, this.maleNpcLayer);
+            const npc = this.createNode(`MaleNpc_${partner.id}`, this.isoDepthLayer);
             npc.setPosition(positions[index]);
             npc.getComponent(UITransform)?.setContentSize(150, 190);
 
@@ -794,7 +1472,10 @@ export class CityExplore extends Component {
             );
 
             this.makeInteractive(npc, () => this.openMaleDialogue(partner));
+            this.maleNpcNodes.push(npc);
+            this.registerIsoDepth(npc);
         });
+        this.sortIsometricDepth();
     }
 
     private openMaleDialogue(partner: PartnerSupport): void {
@@ -3207,6 +3888,56 @@ export class CityExplore extends Component {
             Math.max(-maxOffsetX, Math.min(maxOffsetX, -this.player.position.x)),
             Math.max(-maxOffsetY, Math.min(maxOffsetY, -this.player.position.y)),
         );
+    }
+
+    private isInIsometricCity(x: number, y: number): boolean {
+        return x >= ISO_CITY_LEFT
+            && x <= ISO_CITY_RIGHT
+            && y >= ISO_CITY_BOTTOM
+            && y <= ISO_CITY_TOP;
+    }
+
+    private registerIsoDepth(node: Node): void {
+        if (this.isoDepthNodes.indexOf(node) < 0) {
+            this.isoDepthNodes.push(node);
+        }
+    }
+
+    private sortIsometricDepth(): void {
+        this.isoDepthNodes = this.isoDepthNodes.filter((node) => node?.isValid);
+        const ordered = [...this.isoDepthNodes].sort(
+            (left, right) => right.position.y - left.position.y,
+        );
+        ordered.forEach((node, index) => {
+            if (node.parent === this.isoDepthLayer) {
+                node.setSiblingIndex(index);
+            }
+        });
+    }
+
+    private updateCityDepthPresentation(): void {
+        if (!this.player?.isValid) {
+            return;
+        }
+        const inside = this.isInIsometricCity(
+            this.player.position.x,
+            this.player.position.y,
+        );
+        if (inside) {
+            const depthRatio = Math.max(
+                0,
+                Math.min(
+                    1,
+                    (ISO_CITY_TOP - this.player.position.y)
+                        / (ISO_CITY_TOP - ISO_CITY_BOTTOM),
+                ),
+            );
+            const scale = 0.84 + depthRatio * 0.2;
+            this.player.setScale(new Vec3(scale, scale, 1));
+        } else if (this.player.scale.x !== 1) {
+            this.player.setScale(Vec3.ONE);
+        }
+        this.sortIsometricDepth();
     }
 
     private updateLocation(): void {

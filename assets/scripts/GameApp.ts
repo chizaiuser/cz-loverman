@@ -37,10 +37,75 @@ const { ccclass } = _decorator;
 const DESIGN_WIDTH = 750;
 const DESIGN_HEIGHT = 1334;
 
+interface MarketStallDefinition {
+    name: string;
+    sign: string;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    body: Color;
+    roof: Color;
+    accent: Color;
+    kind: 'flower' | 'sweet' | 'tea';
+}
+
+const MARKET_STALLS: MarketStallDefinition[] = [
+    {
+        name: 'SakuraFlowerStall',
+        sign: '花笺小铺',
+        x: -255,
+        y: 80,
+        width: 218,
+        height: 174,
+        body: new Color(255, 232, 242, 255),
+        roof: new Color(207, 127, 176, 255),
+        accent: new Color(255, 153, 199, 255),
+        kind: 'flower',
+    },
+    {
+        name: 'SweetMarketStall',
+        sign: '樱甜屋',
+        x: 255,
+        y: 65,
+        width: 222,
+        height: 182,
+        body: new Color(255, 240, 228, 255),
+        roof: new Color(204, 129, 154, 255),
+        accent: new Color(244, 173, 137, 255),
+        kind: 'sweet',
+    },
+    {
+        name: 'TeaCart',
+        sign: '花茶车',
+        x: -300,
+        y: -210,
+        width: 158,
+        height: 112,
+        body: new Color(255, 240, 249, 255),
+        roof: new Color(173, 130, 190, 255),
+        accent: new Color(169, 145, 225, 255),
+        kind: 'tea',
+    },
+    {
+        name: 'GiftBoxStall',
+        sign: '礼物匣',
+        x: 305,
+        y: -225,
+        width: 146,
+        height: 104,
+        body: new Color(255, 239, 244, 255),
+        roof: new Color(190, 136, 182, 255),
+        accent: new Color(237, 151, 184, 255),
+        kind: 'sweet',
+    },
+];
+
 @ccclass('GameApp')
 export class GameApp extends Component {
     private backgroundLayer!: Node;
-    private characterLayer!: Node;
+    private marketDepthLayer!: Node;
+    private foregroundLayer!: Node;
     private storyLayer!: Node;
     private actionLayer!: Node;
     private modalLayer!: Node;
@@ -55,12 +120,14 @@ export class GameApp extends Component {
     private objectiveLabel: Label | null = null;
     private clueBubble: Node | null = null;
     private clueCard: Node | null = null;
+    private depthNodes: Node[] = [];
 
     protected start(): void {
         gameFeel.init();
         this.progress = loadProgress();
         this.createLayers();
         this.createBackground();
+        this.createMarketDiorama();
         this.createCharacters();
         this.createStoryUi();
         this.createActions();
@@ -71,7 +138,8 @@ export class GameApp extends Component {
 
     private createLayers(): void {
         this.backgroundLayer = this.createLayer('BackgroundLayer');
-        this.characterLayer = this.createLayer('CharacterLayer');
+        this.marketDepthLayer = this.createLayer('MarketDepthLayer');
+        this.foregroundLayer = this.createLayer('MarketForegroundLayer');
         this.storyLayer = this.createLayer('StoryUiLayer');
         this.actionLayer = this.createLayer('ActionLayer');
         this.modalLayer = this.createLayer('ModalLayer');
@@ -195,32 +263,269 @@ export class GameApp extends Component {
         graphics.fill();
     }
 
+    private createMarketDiorama(): void {
+        this.createMarketStringLights();
+        MARKET_STALLS.forEach((stall) => {
+            this.createMarketStall(stall);
+        });
+        this.createMarketLantern(-348, -320);
+        this.createMarketLantern(348, -370);
+        this.createForegroundDetails();
+        this.sortMarketDepth();
+    }
+
+    private createMarketStall(stall: MarketStallDefinition): void {
+        const node = this.createUiNode(stall.name, this.marketDepthLayer);
+        node.setPosition(stall.x, stall.y);
+        node.getComponent(UITransform)?.setContentSize(stall.width + 90, stall.height + 100);
+        const graphics = node.addComponent(Graphics);
+        const halfWidth = stall.width / 2;
+        const sideDirection = stall.x < 0 ? 1 : -1;
+        const skew = 48 * sideDirection;
+        const depth = 42;
+        const sideColor = new Color(
+            Math.round(stall.body.r * 0.72),
+            Math.round(stall.body.g * 0.72),
+            Math.round(stall.body.b * 0.72),
+            255,
+        );
+
+        graphics.fillColor = new Color(84, 57, 83, 62);
+        graphics.ellipse(12, -13, stall.width * 0.54, 24);
+        graphics.fill();
+
+        graphics.fillColor = sideColor;
+        const sideEdge = sideDirection > 0 ? halfWidth : -halfWidth;
+        graphics.moveTo(sideEdge, 0);
+        graphics.lineTo(sideEdge + skew, depth);
+        graphics.lineTo(sideEdge + skew, stall.height + depth);
+        graphics.lineTo(sideEdge, stall.height);
+        graphics.close();
+        graphics.fill();
+
+        graphics.fillColor = stall.roof;
+        graphics.moveTo(-halfWidth, stall.height);
+        graphics.lineTo(halfWidth, stall.height);
+        graphics.lineTo(halfWidth + skew, stall.height + depth);
+        graphics.lineTo(-halfWidth + skew, stall.height + depth);
+        graphics.close();
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 252, 253, 225);
+        graphics.lineWidth = 4;
+        graphics.stroke();
+
+        graphics.fillColor = stall.body;
+        graphics.roundRect(-halfWidth, 0, stall.width, stall.height, 17);
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 252, 253, 230);
+        graphics.lineWidth = 4;
+        graphics.roundRect(-halfWidth, 0, stall.width, stall.height, 17);
+        graphics.stroke();
+
+        graphics.fillColor = new Color(97, 64, 99, 235);
+        graphics.roundRect(
+            -halfWidth + 16,
+            stall.height - 46,
+            stall.width - 32,
+            30,
+            13,
+        );
+        graphics.fill();
+        this.addLabel(
+            node,
+            'StallSign',
+            stall.sign,
+            17,
+            Color.WHITE,
+            new Vec3(0, stall.height - 31),
+            stall.width - 46,
+            28,
+            true,
+        );
+
+        graphics.fillColor = stall.accent;
+        graphics.roundRect(-halfWidth + 11, stall.height - 77, stall.width - 22, 20, 9);
+        graphics.fill();
+        const stripeWidth = (stall.width - 40) / 9;
+        for (let index = 0; index < 9; index += 1) {
+            if (index % 2 === 0) {
+                graphics.fillColor = new Color(255, 249, 252, 220);
+                graphics.roundRect(
+                    -halfWidth + 20 + index * stripeWidth,
+                    stall.height - 77,
+                    stripeWidth,
+                    20,
+                    5,
+                );
+                graphics.fill();
+            }
+        }
+
+        graphics.fillColor = new Color(122, 82, 111, 245);
+        graphics.roundRect(-halfWidth + 14, 12, stall.width - 28, 50, 13);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 246, 250, 245);
+        graphics.roundRect(-halfWidth + 24, 67, stall.width - 48, 12, 6);
+        graphics.fill();
+
+        if (stall.kind === 'flower') {
+            for (let index = 0; index < 7; index += 1) {
+                const x = -halfWidth + 40 + index * (stall.width - 80) / 6;
+                graphics.fillColor = index % 2 === 0
+                    ? new Color(255, 149, 195, 255)
+                    : new Color(225, 185, 246, 255);
+                for (let petal = 0; petal < 5; petal += 1) {
+                    const angle = Math.PI * 2 * petal / 5;
+                    graphics.circle(x + Math.cos(angle) * 8, 94 + Math.sin(angle) * 8, 6);
+                }
+                graphics.fill();
+                graphics.fillColor = new Color(255, 231, 148, 255);
+                graphics.circle(x, 94, 5);
+                graphics.fill();
+            }
+        } else if (stall.kind === 'sweet') {
+            const cakeColors = [
+                new Color(255, 178, 200, 255),
+                new Color(249, 206, 144, 255),
+                new Color(205, 177, 240, 255),
+            ];
+            for (let index = 0; index < 4; index += 1) {
+                graphics.fillColor = cakeColors[index % cakeColors.length];
+                graphics.roundRect(
+                    -halfWidth + 34 + index * (stall.width - 78) / 4,
+                    83,
+                    38,
+                    27,
+                    8,
+                );
+                graphics.fill();
+            }
+        } else {
+            graphics.fillColor = new Color(255, 247, 237, 250);
+            graphics.circle(-34, 91, 15);
+            graphics.circle(0, 91, 15);
+            graphics.circle(34, 91, 15);
+            graphics.fill();
+            graphics.strokeColor = new Color(156, 117, 167, 230);
+            graphics.lineWidth = 3;
+            graphics.arc(-34, 91, 21, 0, Math.PI, false);
+            graphics.arc(0, 91, 21, 0, Math.PI, false);
+            graphics.arc(34, 91, 21, 0, Math.PI, false);
+            graphics.stroke();
+        }
+
+        graphics.fillColor = new Color(255, 245, 250, 235);
+        graphics.moveTo(-halfWidth + 18, 17);
+        graphics.lineTo(halfWidth - 18, 17);
+        graphics.lineTo(halfWidth - 32, 37);
+        graphics.lineTo(-halfWidth + 32, 37);
+        graphics.close();
+        graphics.fill();
+
+        this.registerMarketDepth(node);
+    }
+
+    private createMarketLantern(x: number, y: number): void {
+        const lantern = this.createUiNode('MarketLantern', this.marketDepthLayer);
+        lantern.setPosition(x, y);
+        const graphics = lantern.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 226, 166, 30);
+        graphics.circle(0, 164, 72);
+        graphics.fill();
+        graphics.fillColor = new Color(103, 73, 105, 245);
+        graphics.roundRect(-5, 0, 10, 150, 5);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 225, 152, 255);
+        graphics.roundRect(-24, 128, 48, 58, 14);
+        graphics.fill();
+        graphics.strokeColor = new Color(117, 78, 112, 245);
+        graphics.lineWidth = 4;
+        graphics.roundRect(-24, 128, 48, 58, 14);
+        graphics.stroke();
+        graphics.fillColor = new Color(255, 250, 218, 255);
+        graphics.circle(0, 157, 11);
+        graphics.fill();
+        this.registerMarketDepth(lantern);
+    }
+
+    private createMarketStringLights(): void {
+        const lights = this.createUiNode('MarketStringLights', this.backgroundLayer);
+        const graphics = lights.addComponent(Graphics);
+        graphics.strokeColor = new Color(126, 85, 128, 150);
+        graphics.lineWidth = 3;
+        graphics.moveTo(-375, 246);
+        graphics.bezierCurveTo(-190, 174, 190, 174, 375, 238);
+        graphics.stroke();
+
+        for (let index = 0; index < 13; index += 1) {
+            const ratio = index / 12;
+            const x = -345 + ratio * 690;
+            const y = 242 - Math.sin(ratio * Math.PI) * 45 + (index % 2) * 6;
+            graphics.fillColor = new Color(255, 230, 166, 75);
+            graphics.circle(x, y, 13);
+            graphics.fill();
+            graphics.fillColor = new Color(255, 244, 190, 255);
+            graphics.circle(x, y, 6);
+            graphics.fill();
+        }
+    }
+
+    private createForegroundDetails(): void {
+        const foreground = this.createUiNode('MarketForeground', this.foregroundLayer);
+        const graphics = foreground.addComponent(Graphics);
+
+        graphics.fillColor = new Color(255, 196, 219, 220);
+        graphics.circle(-334, -554, 88);
+        graphics.circle(-274, -584, 68);
+        graphics.circle(332, -567, 94);
+        graphics.circle(272, -599, 65);
+        graphics.fill();
+        graphics.fillColor = new Color(255, 230, 241, 220);
+        graphics.circle(-308, -519, 42);
+        graphics.circle(301, -535, 46);
+        graphics.fill();
+
+        const crystalColor = new Color(180, 145, 242, 220);
+        graphics.fillColor = crystalColor;
+        this.drawCrystal(graphics, -357, -612, 46, 164);
+        this.drawCrystal(graphics, 350, -621, 54, 188);
+
+        graphics.fillColor = new Color(255, 172, 207, 210);
+        for (let index = 0; index < 16; index += 1) {
+            graphics.circle(
+                -360 + (index * 73) % 720,
+                -410 - (index * 31) % 250,
+                3 + index % 3,
+            );
+            graphics.fill();
+        }
+    }
+
     private createCharacters(): void {
-        const player = this.createSpriteNode(
-            this.characterLayer,
+        this.createCharacterRig(
             'PlayerCharacter',
             'scene/layers/pink-girl-hd/spriteFrame',
-            new Vec3(-200, -205),
+            new Vec3(-200, -430),
             213,
             540,
+            () => this.showModal(
+                '人物观察',
+                '粉衣女孩正站在樱花集市入口。\n\n她似乎正在寻找与“樱花甜品”有关的线索。',
+                new Color(255, 147, 190, 255),
+            ),
+            1.8,
         );
-        this.makeInteractive(player, () => this.showModal(
-            '人物观察',
-            '粉衣女孩正站在樱花集市入口。\n\n她似乎正在寻找与“樱花甜品”有关的线索。',
-            new Color(255, 147, 190, 255),
-        ));
-        gameFeel.float(player, 4, 1.8);
 
-        const silverBoy = this.createSpriteNode(
-            this.characterLayer,
+        this.createCharacterRig(
             'SilverHairCharacter',
             'scene/layers/silver-boy/spriteFrame',
-            new Vec3(198, -170),
+            new Vec3(198, -365),
             178,
             386,
+            () => this.startStoryDialogue(),
+            2.1,
         );
-        this.makeInteractive(silverBoy, () => this.startStoryDialogue());
-        gameFeel.float(silverBoy, 4, 2.1);
+        this.sortMarketDepth();
     }
 
     private createStoryUi(): void {
@@ -946,21 +1251,55 @@ export class GameApp extends Component {
         return button;
     }
 
-    private createSpriteNode(
-        parent: Node,
+    private createCharacterRig(
         name: string,
         resourcePath: string,
-        position: Vec3,
+        footPosition: Vec3,
         width: number,
         height: number,
+        onTap: () => void,
+        floatDuration: number,
     ): Node {
-        const node = this.createUiNode(name, parent);
-        node.setPosition(position);
-        node.getComponent(UITransform)?.setContentSize(width, height);
-        const sprite = node.addComponent(Sprite);
+        const root = this.createUiNode(name, this.marketDepthLayer);
+        root.setPosition(footPosition);
+        root.getComponent(UITransform)?.setContentSize(width, height);
+
+        const shadow = this.createUiNode('CharacterShadow', root);
+        shadow.setPosition(0, -3);
+        shadow.getComponent(UITransform)?.setContentSize(width * 0.62, 22);
+        const shadowGraphics = shadow.addComponent(Graphics);
+        shadowGraphics.fillColor = new Color(91, 62, 91, 72);
+        shadowGraphics.ellipse(0, 0, width * 0.31, 14);
+        shadowGraphics.fill();
+
+        const visual = this.createUiNode('CharacterVisual', root);
+        visual.setPosition(0, height / 2);
+        visual.getComponent(UITransform)?.setContentSize(width, height);
+        const sprite = visual.addComponent(Sprite);
         sprite.sizeMode = Sprite.SizeMode.CUSTOM;
         this.loadSprite(sprite, resourcePath);
-        return node;
+        this.makeInteractive(visual, onTap);
+        gameFeel.float(visual, 4, floatDuration);
+        this.registerMarketDepth(root);
+        return root;
+    }
+
+    private registerMarketDepth(node: Node): void {
+        if (this.depthNodes.indexOf(node) < 0) {
+            this.depthNodes.push(node);
+        }
+    }
+
+    private sortMarketDepth(): void {
+        this.depthNodes = this.depthNodes.filter((node) => node?.isValid);
+        const ordered = [...this.depthNodes].sort(
+            (left, right) => right.position.y - left.position.y,
+        );
+        ordered.forEach((node, index) => {
+            if (node.parent === this.marketDepthLayer) {
+                node.setSiblingIndex(index);
+            }
+        });
     }
 
     private loadSprite(sprite: Sprite, resourcePath: string): void {
