@@ -120,9 +120,9 @@ const CITY_ISO_BUILDINGS: IsometricBuildingDefinition[] = [
     {
         name: '樱花钟楼',
         x: 0,
-        y: 1180,
-        width: 280,
-        height: 500,
+        y: 880,
+        width: 300,
+        height: 240,
         body: new Color(247, 223, 238, 255),
         roof: new Color(131, 94, 154, 255),
         accent: new Color(203, 166, 225, 255),
@@ -281,6 +281,8 @@ export class CityExplore extends Component {
     private joystickKnob!: Node;
     private locationLabel!: Label;
     private coinLabel!: Label;
+    private coinPill!: Node;
+    private charmPill!: Node;
     private jobPromptButton!: Node;
     private jobPromptLabel!: Label;
     private venuePromptButton!: Node;
@@ -525,7 +527,6 @@ export class CityExplore extends Component {
 
         graphics.fillColor = new Color(255, 236, 245, 235);
         graphics.ellipse(0, 900, 640, 230);
-        graphics.ellipse(0, 1180, 260, 112);
         graphics.ellipse(0, -820, 660, 250);
         graphics.fill();
 
@@ -606,13 +607,11 @@ export class CityExplore extends Component {
         graphics.strokeColor = new Color(255, 248, 252, 210);
         graphics.lineWidth = 5;
         graphics.ellipse(0, 900, 560, 178);
-        graphics.ellipse(0, 1180, 220, 88);
         graphics.ellipse(0, -820, 580, 198);
         graphics.stroke();
         graphics.strokeColor = new Color(222, 173, 209, 165);
         graphics.lineWidth = 3;
         graphics.ellipse(0, 900, 515, 148);
-        graphics.ellipse(0, 1180, 188, 68);
         graphics.ellipse(0, -820, 535, 166);
         graphics.stroke();
     }
@@ -733,7 +732,7 @@ export class CityExplore extends Component {
         const windowsWidth = windowCount * windowWidth + (windowCount - 1) * windowGap;
         const windowStart = -windowsWidth / 2;
         const windowRows = config.style === 'tower'
-            ? 1
+            ? 0
             : config.height >= 300
                 ? 2
                 : 1;
@@ -826,7 +825,7 @@ export class CityExplore extends Component {
             graphics.roundRect(-halfWidth + 20, 61, config.width - 40, 8, 4);
             graphics.fill();
         } else if (config.style === 'tower') {
-            const clockY = config.height - 142;
+            const clockY = config.height - 76;
             graphics.fillColor = config.roof;
             graphics.moveTo(-42, config.height + ISO_BUILDING_DEPTH + 4);
             graphics.lineTo(0, config.height + ISO_BUILDING_DEPTH + 66);
@@ -887,17 +886,19 @@ export class CityExplore extends Component {
         graphics.roundRect(-104, config.height + ISO_BUILDING_DEPTH + 8, 208, 34, 15);
         graphics.fill();
 
-        this.addLabel(
-            building,
-            'BuildingName',
-            config.name,
-            20,
-            Color.WHITE,
-            new Vec3(0, config.height - 41),
-            config.width - 64,
-            34,
-            true,
-        );
+        if (config.style !== 'tower') {
+            this.addLabel(
+                building,
+                'BuildingName',
+                config.name,
+                20,
+                Color.WHITE,
+                new Vec3(0, config.height - 41),
+                config.width - 64,
+                34,
+                true,
+            );
+        }
         if (config.style !== 'tower') {
             this.addLabel(
                 building,
@@ -1073,6 +1074,7 @@ export class CityExplore extends Component {
             const bench = this.createNode(`FountainBench_${index}`, this.isoDepthLayer);
             bench.setPosition(position);
             bench.getComponent(UITransform)?.setContentSize(180, 120);
+            bench.getComponent(UITransform)?.setAnchorPoint(0.5, 0);
             const graphics = bench.addComponent(Graphics);
             graphics.fillColor = new Color(87, 61, 83, 55);
             graphics.ellipse(0, -3, 86, 20);
@@ -1765,10 +1767,10 @@ export class CityExplore extends Component {
             true,
         );
 
-        const coinPill = this.createNode('CoinPill', this.hudLayer);
-        coinPill.setPosition(285, 435);
-        coinPill.getComponent(UITransform)?.setContentSize(128, 44);
-        const coinGraphics = coinPill.addComponent(Graphics);
+        this.coinPill = this.createNode('CoinPill', this.hudLayer);
+        this.coinPill.setPosition(285, 435);
+        this.coinPill.getComponent(UITransform)?.setContentSize(128, 44);
+        const coinGraphics = this.coinPill.addComponent(Graphics);
         coinGraphics.fillColor = new Color(255, 240, 183, 235);
         coinGraphics.strokeColor = new Color(236, 183, 112, 235);
         coinGraphics.lineWidth = 2;
@@ -1776,7 +1778,7 @@ export class CityExplore extends Component {
         coinGraphics.fill();
         coinGraphics.stroke();
         this.coinLabel = this.addLabel(
-            coinPill,
+            this.coinPill,
             'CoinLabel',
             `金币 ${this.progress.coins}`,
             19,
@@ -1786,10 +1788,10 @@ export class CityExplore extends Component {
             38,
             true,
         );
-        const charmPill = this.createNode('CharmPill', this.hudLayer);
-        charmPill.setPosition(0, 435);
-        charmPill.getComponent(UITransform)?.setContentSize(170, 44);
-        const charmGraphics = charmPill.addComponent(Graphics);
+        this.charmPill = this.createNode('CharmPill', this.hudLayer);
+        this.charmPill.setPosition(0, 435);
+        this.charmPill.getComponent(UITransform)?.setContentSize(170, 44);
+        const charmGraphics = this.charmPill.addComponent(Graphics);
         charmGraphics.fillColor = new Color(255, 224, 240, 238);
         charmGraphics.strokeColor = new Color(232, 145, 188, 235);
         charmGraphics.lineWidth = 2;
@@ -1797,7 +1799,7 @@ export class CityExplore extends Component {
         charmGraphics.fill();
         charmGraphics.stroke();
         this.charmLabel = this.addLabel(
-            charmPill,
+            this.charmPill,
             'CharmLabel',
             '魅力 0',
             19,
@@ -4204,6 +4206,13 @@ export class CityExplore extends Component {
             location = '花街商铺区';
         } else if (this.player.position.y > -620) {
             location = '中央喷泉街';
+        }
+        const showQuickStats = this.player.position.y <= 780;
+        if (this.coinPill?.isValid) {
+            this.coinPill.active = showQuickStats;
+        }
+        if (this.charmPill?.isValid) {
+            this.charmPill.active = showQuickStats;
         }
         if (location !== this.lastLocation && this.locationLabel?.isValid) {
             this.lastLocation = location;

@@ -379,7 +379,7 @@ export class VenueInterior extends Component {
             34,
             true,
         );
-        this.makeInteractive(parent, onTap);
+        this.makeInteractive(hotspot, onTap);
         tween(hotspot)
             .repeatForever(
                 tween()
