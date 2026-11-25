@@ -384,54 +384,130 @@ export class CharacterCustomization extends Component {
 
         if (outfit.accessory === 'stars') {
             graphics.fillColor = outfit.accent;
-            graphics.moveTo(-80, 244);
-            graphics.lineTo(-24, 287);
-            graphics.lineTo(18, 248);
-            graphics.lineTo(76, 270);
-            graphics.lineTo(25, 226);
+            graphics.moveTo(-78, 222);
+            graphics.lineTo(-45, 241);
+            graphics.lineTo(0, 229);
+            graphics.lineTo(45, 243);
+            graphics.lineTo(78, 224);
+            graphics.lineTo(72, 242);
+            graphics.lineTo(0, 255);
+            graphics.lineTo(-72, 242);
             graphics.close();
             graphics.fill();
-            graphics.fillColor = new Color(255, 240, 164, 245);
-            graphics.circle(-52, 260, 8);
-            graphics.circle(44, 253, 7);
+            this.drawFourPointStar(graphics, -48, 252, 13, new Color(255, 243, 187, 255));
+            this.drawFourPointStar(graphics, 0, 271, 18, new Color(255, 252, 229, 255));
+            this.drawFourPointStar(graphics, 49, 253, 12, new Color(255, 243, 187, 255));
+            graphics.fillColor = new Color(255, 255, 255, 220);
+            graphics.circle(-18, 238, 4);
+            graphics.circle(22, 239, 4);
+            graphics.circle(0, 250, 3);
             graphics.fill();
         } else if (outfit.accessory === 'street') {
             graphics.strokeColor = outfit.accent;
             graphics.lineWidth = 13;
-            graphics.arc(0, 192, 84, 0, Math.PI, false);
+            graphics.arc(0, 192, 84, Math.PI, Math.PI * 2, false);
             graphics.stroke();
             graphics.fillColor = outfit.accent;
             graphics.roundRect(-99, 168, 30, 62, 14);
             graphics.roundRect(69, 168, 30, 62, 14);
             graphics.fill();
+            graphics.fillColor = new Color(41, 58, 79, 235);
+            graphics.roundRect(-93, 176, 18, 45, 9);
+            graphics.roundRect(75, 176, 18, 45, 9);
+            graphics.fill();
+            graphics.strokeColor = new Color(209, 247, 255, 230);
+            graphics.lineWidth = 4;
+            graphics.moveTo(96, 178);
+            graphics.bezierCurveTo(91, 139, 69, 127, 52, 145);
+            graphics.stroke();
+            graphics.fillColor = new Color(234, 252, 255, 255);
+            graphics.circle(52, 145, 6);
+            graphics.fill();
         } else if (outfit.accessory === 'academy') {
             graphics.fillColor = outfit.accent;
-            graphics.ellipse(49, 246, 78, 24);
+            graphics.moveTo(-20, 239);
+            graphics.lineTo(17, 258);
+            graphics.lineTo(25, 281);
+            graphics.lineTo(58, 293);
+            graphics.lineTo(92, 278);
+            graphics.lineTo(104, 252);
+            graphics.lineTo(76, 233);
+            graphics.lineTo(31, 230);
+            graphics.close();
             graphics.fill();
-            graphics.roundRect(9, 235, 86, 24, 12);
+            graphics.strokeColor = new Color(255, 228, 198, 235);
+            graphics.lineWidth = 3;
+            graphics.stroke();
+            graphics.fillColor = new Color(
+                Math.round(outfit.accent.r * 0.78),
+                Math.round(outfit.accent.g * 0.78),
+                Math.round(outfit.accent.b * 0.78),
+                255,
+            );
+            graphics.moveTo(-18, 239);
+            graphics.lineTo(101, 248);
+            graphics.lineTo(94, 260);
+            graphics.lineTo(-21, 252);
+            graphics.close();
             graphics.fill();
-        } else if (outfit.accessory === 'flower') {
+            graphics.strokeColor = new Color(255, 230, 194, 235);
+            graphics.lineWidth = 3;
+            graphics.moveTo(2, 252);
+            graphics.lineTo(83, 257);
+            graphics.stroke();
+            graphics.fillColor = new Color(255, 239, 190, 255);
+            graphics.circle(63, 274, 5);
+            graphics.fill();
             graphics.fillColor = outfit.accent;
-            graphics.circle(-84, 176, 16);
-            graphics.circle(-64, 187, 14);
-            graphics.circle(-62, 163, 13);
+            graphics.moveTo(78, 265);
+            graphics.lineTo(104, 253);
+            graphics.lineTo(98, 269);
+            graphics.lineTo(110, 281);
+            graphics.lineTo(79, 277);
+            graphics.close();
             graphics.fill();
-            graphics.fillColor = new Color(255, 237, 172, 255);
-            graphics.circle(-73, 176, 7);
+
+            graphics.fillColor = outfit.accent;
+            graphics.roundRect(-35, 76, 70, 18, 9);
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 224, 191, 200);
+            graphics.lineWidth = 2;
+            graphics.moveTo(-27, 84);
+            graphics.lineTo(27, 84);
+            graphics.moveTo(-16, 77);
+            graphics.lineTo(-16, 93);
+            graphics.moveTo(13, 77);
+            graphics.lineTo(13, 93);
+            graphics.stroke();
+        } else if (outfit.accessory === 'flower') {
+            this.drawFlowerPin(
+                graphics,
+                43,
+                228,
+                8,
+                9,
+                outfit.accent,
+                new Color(255, 244, 194, 255),
+            );
+            graphics.fillColor = new Color(115, 166, 136, 240);
+            graphics.moveTo(23, 214);
+            graphics.lineTo(43, 225);
+            graphics.lineTo(24, 235);
+            graphics.close();
             graphics.fill();
         } else {
-            graphics.fillColor = outfit.accent;
-            for (let petal = 0; petal < 5; petal += 1) {
-                const angle = Math.PI * 2 * petal / 5;
-                graphics.circle(
-                    -82 + Math.cos(angle) * 14,
-                    188 + Math.sin(angle) * 14,
-                    10,
-                );
-            }
-            graphics.fill();
-            graphics.fillColor = new Color(255, 236, 171, 255);
-            graphics.circle(-82, 188, 7);
+            this.drawFlowerPin(
+                graphics,
+                44,
+                233,
+                5,
+                10,
+                outfit.accent,
+                new Color(255, 236, 171, 255),
+            );
+            graphics.fillColor = new Color(255, 255, 255, 210);
+            graphics.circle(64, 248, 4);
+            graphics.circle(72, 239, 3);
             graphics.fill();
         }
         this.outfitPreviewAccessory = accessory;
@@ -963,6 +1039,65 @@ export class CharacterCustomization extends Component {
             .set({ scale: new Vec3(0.92, 0.92, 1) })
             .to(0.2, { scale: Vec3.ONE }, { easing: 'backOut' })
             .start();
+    }
+
+    private drawFourPointStar(
+        graphics: Graphics,
+        x: number,
+        y: number,
+        radius: number,
+        color: Color,
+    ): void {
+        const inner = radius * 0.34;
+        graphics.fillColor = color;
+        graphics.moveTo(x, y + radius);
+        graphics.lineTo(x + inner, y + inner);
+        graphics.lineTo(x + radius, y);
+        graphics.lineTo(x + inner, y - inner);
+        graphics.lineTo(x, y - radius);
+        graphics.lineTo(x - inner, y - inner);
+        graphics.lineTo(x - radius, y);
+        graphics.lineTo(x - inner, y + inner);
+        graphics.close();
+        graphics.fill();
+    }
+
+    private drawFlowerPin(
+        graphics: Graphics,
+        x: number,
+        y: number,
+        petalCount: number,
+        radius: number,
+        petalColor: Color,
+        centerColor: Color,
+    ): void {
+        graphics.fillColor = petalColor;
+        for (let index = 0; index < petalCount; index += 1) {
+            const angle = -Math.PI / 2 + Math.PI * 2 * index / petalCount;
+            const petalX = x + Math.cos(angle) * radius * 1.55;
+            const petalY = y + Math.sin(angle) * radius * 1.55;
+            graphics.fillColor = petalColor;
+            graphics.circle(
+                petalX,
+                petalY,
+                radius * 0.82,
+            );
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 255, 255, 190);
+            graphics.lineWidth = 2;
+            graphics.circle(petalX, petalY, radius * 0.82);
+            graphics.stroke();
+        }
+        graphics.fillColor = centerColor;
+        graphics.circle(x, y, radius * 0.72);
+        graphics.fill();
+        graphics.strokeColor = new Color(255, 255, 255, 220);
+        graphics.lineWidth = 2;
+        graphics.circle(x, y, radius * 0.72);
+        graphics.stroke();
+        graphics.fillColor = new Color(255, 255, 255, 180);
+        graphics.circle(x - radius * 0.22, y + radius * 0.24, radius * 0.22);
+        graphics.fill();
     }
 
     private loadSprite(sprite: Sprite, resourcePath: string): void {

@@ -3492,50 +3492,136 @@ export class CityExplore extends Component {
         graphics.lineWidth = 3;
 
         if (outfit.accessory === 'flower') {
-            graphics.circle(-34, 1, 8);
-            graphics.circle(-44, -7, 10);
-            graphics.circle(-25, -10, 10);
-            graphics.circle(-32, -19, 8);
-            graphics.fill();
-            graphics.fillColor = new Color(255, 236, 164, 255);
-            graphics.circle(-33, -8, 6);
+            this.drawMiniFlower(graphics, -18, 66, 8, 3.4, outfit.accent);
+            graphics.fillColor = new Color(112, 163, 132, 230);
+            graphics.moveTo(-25, 57);
+            graphics.lineTo(-17, 62);
+            graphics.lineTo(-24, 67);
+            graphics.close();
             graphics.fill();
         } else if (outfit.accessory === 'stars') {
-            for (let index = 0; index < 5; index += 1) {
-                const angle = Math.PI * 2 * index / 5;
-                graphics.circle(Math.cos(angle) * 66, 52 + Math.sin(angle) * 40, 6);
-            }
-            graphics.fill();
+            graphics.strokeColor = outfit.accent;
+            graphics.lineWidth = 3;
+            graphics.moveTo(-21, 69);
+            graphics.lineTo(-10, 76);
+            graphics.lineTo(0, 70);
+            graphics.lineTo(11, 76);
+            graphics.lineTo(21, 69);
+            graphics.stroke();
+            this.drawMiniStar(graphics, -11, 78, 3.2, new Color(255, 245, 187, 255));
+            this.drawMiniStar(graphics, 0, 83, 4.4, new Color(255, 253, 231, 255));
+            this.drawMiniStar(graphics, 11, 78, 3.2, new Color(255, 245, 187, 255));
         } else if (outfit.accessory === 'street') {
             graphics.strokeColor = outfit.accent;
-            graphics.lineWidth = 7;
-            graphics.moveTo(-42, 52);
-            graphics.lineTo(42, 52);
+            graphics.lineWidth = 6;
+            graphics.arc(0, 44, 35, Math.PI, Math.PI * 2, false);
             graphics.stroke();
             graphics.fillColor = outfit.accent;
-            graphics.circle(-45, 45, 13);
-            graphics.circle(45, 45, 13);
+            graphics.roundRect(-42, 18, 14, 36, 7);
+            graphics.roundRect(28, 18, 14, 36, 7);
+            graphics.fill();
+            graphics.fillColor = new Color(255, 255, 255, 190);
+            graphics.roundRect(-39, 24, 5, 22, 3);
+            graphics.roundRect(31, 24, 5, 22, 3);
             graphics.fill();
         } else if (outfit.accessory === 'academy') {
             graphics.fillColor = outfit.accent;
-            graphics.moveTo(-50, 73);
-            graphics.lineTo(28, 73);
-            graphics.lineTo(52, 92);
-            graphics.lineTo(-22, 96);
+            graphics.moveTo(-5, 72);
+            graphics.lineTo(14, 75);
+            graphics.lineTo(34, 70);
+            graphics.lineTo(45, 78);
+            graphics.lineTo(42, 85);
+            graphics.lineTo(24, 91);
+            graphics.lineTo(3, 88);
+            graphics.lineTo(-12, 79);
             graphics.close();
             graphics.fill();
-            graphics.strokeColor = new Color(255, 239, 218, 235);
-            graphics.lineWidth = 6;
-            graphics.moveTo(-48, 20);
-            graphics.lineTo(44, 20);
+            graphics.fillColor = new Color(
+                Math.round(outfit.accent.r * 0.78),
+                Math.round(outfit.accent.g * 0.78),
+                Math.round(outfit.accent.b * 0.78),
+                255,
+            );
+            graphics.moveTo(-14, 76);
+            graphics.lineTo(41, 79);
+            graphics.lineTo(40, 84);
+            graphics.lineTo(-13, 82);
+            graphics.close();
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 227, 190, 230);
+            graphics.lineWidth = 1;
+            graphics.moveTo(0, 81);
+            graphics.lineTo(38, 83);
+            graphics.stroke();
+            graphics.fillColor = outfit.accent;
+            graphics.roundRect(-16, 20, 32, 9, 4);
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 224, 191, 210);
+            graphics.lineWidth = 1;
+            graphics.moveTo(-11, 24);
+            graphics.lineTo(11, 24);
+            graphics.moveTo(-3, 20);
+            graphics.lineTo(-3, 29);
+            graphics.moveTo(7, 20);
+            graphics.lineTo(7, 29);
             graphics.stroke();
         } else {
-            graphics.fillColor = new Color(255, 238, 247, 220);
-            graphics.circle(-52, 48, 7);
-            graphics.circle(50, 18, 5);
-            graphics.circle(-38, -26, 4);
+            this.drawMiniFlower(graphics, -18, 68, 5, 3, outfit.accent);
+            graphics.fillColor = new Color(255, 255, 255, 210);
+            graphics.circle(-10, 75, 2);
             graphics.fill();
         }
+    }
+
+    private drawMiniFlower(
+        graphics: Graphics,
+        x: number,
+        y: number,
+        petalCount: number,
+        radius: number,
+        color: Color,
+    ): void {
+        graphics.fillColor = color;
+        for (let index = 0; index < petalCount; index += 1) {
+            const angle = -Math.PI / 2 + Math.PI * 2 * index / petalCount;
+            const petalX = x + Math.cos(angle) * radius * 1.5;
+            const petalY = y + Math.sin(angle) * radius * 1.5;
+            graphics.fillColor = color;
+            graphics.circle(
+                petalX,
+                petalY,
+                radius * 0.78,
+            );
+            graphics.fill();
+            graphics.strokeColor = new Color(255, 255, 255, 210);
+            graphics.lineWidth = 1;
+            graphics.circle(petalX, petalY, radius * 0.78);
+            graphics.stroke();
+        }
+        graphics.fillColor = new Color(255, 235, 167, 255);
+        graphics.circle(x, y, radius * 0.58);
+        graphics.fill();
+    }
+
+    private drawMiniStar(
+        graphics: Graphics,
+        x: number,
+        y: number,
+        radius: number,
+        color: Color,
+    ): void {
+        const inner = radius * 0.34;
+        graphics.fillColor = color;
+        graphics.moveTo(x, y + radius);
+        graphics.lineTo(x + inner, y + inner);
+        graphics.lineTo(x + radius, y);
+        graphics.lineTo(x + inner, y - inner);
+        graphics.lineTo(x, y - radius);
+        graphics.lineTo(x - inner, y - inner);
+        graphics.lineTo(x - radius, y);
+        graphics.lineTo(x - inner, y + inner);
+        graphics.close();
+        graphics.fill();
     }
 
     private closeWardrobe(): void {
