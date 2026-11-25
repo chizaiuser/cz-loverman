@@ -26,6 +26,7 @@ import {
 } from './GameProgress';
 import { PlayerStatKey } from './StoryData';
 import { gameFeel } from './GameFeel';
+import { backNavigation, navigateTo } from './BackNavigation';
 import { getOutfit, OUTFITS } from './WardrobeData';
 
 const { ccclass } = _decorator;
@@ -121,9 +122,10 @@ export class CharacterCustomization extends Component {
 
     protected start(): void {
         gameFeel.init();
+        backNavigation.mount(() => this.handleBack());
         const saved = loadProgress();
         if (saved.onboardingComplete) {
-            director.loadScene('CityExplore');
+            navigateTo('CityExplore');
             return;
         }
         this.playerName = saved.playerName;
@@ -138,6 +140,16 @@ export class CharacterCustomization extends Component {
         this.createAttributes();
         this.createActions();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.activeModal?.isValid) {
+            this.activeModal.destroy();
+            this.activeModal = null;
+            return true;
+        }
+        backNavigation.exitGame();
+        return true;
     }
 
     private createLayers(): void {
@@ -884,7 +896,7 @@ export class CharacterCustomization extends Component {
         );
         saveProgress(progress);
         gameFeel.play('success');
-        director.loadScene('CityExplore');
+        navigateTo('CityExplore');
     }
 
     private showModal(title: string, message: string, accent: Color): void {

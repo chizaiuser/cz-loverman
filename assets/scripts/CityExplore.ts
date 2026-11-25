@@ -55,6 +55,7 @@ import {
 } from './TaskData';
 import { COSMETICS, CosmeticDefinition } from './BeautyData';
 import { ECONOMY, JOB_REWARDS } from './EconomyData';
+import { backNavigation, navigateTo } from './BackNavigation';
 
 const { ccclass } = _decorator;
 
@@ -319,6 +320,7 @@ export class CityExplore extends Component {
     private maleDialogueModal: Node | null = null;
     private cityMenuModal: Node | null = null;
     private placeModal: Node | null = null;
+    private exitModal: Node | null = null;
     private partnerList: Node | null = null;
     private partnerPageLabel: Label | null = null;
     private partnerActiveLabel: Label | null = null;
@@ -343,10 +345,11 @@ export class CityExplore extends Component {
     protected start(): void {
         this.progress = loadProgress();
         if (!this.progress.onboardingComplete) {
-            director.loadScene('CharacterCustomization');
+            navigateTo('CharacterCustomization');
             return;
         }
         gameFeel.init();
+        backNavigation.mount(() => this.handleBack());
         this.createLayers();
         this.createWorld();
         this.createPlayer();
@@ -355,6 +358,120 @@ export class CityExplore extends Component {
         this.bindKeyboard();
         this.updateCamera();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.exitModal?.isValid) {
+            backNavigation.exitGame();
+            return true;
+        }
+        if (this.placeModal?.isValid) {
+            this.placeModal.destroy();
+            this.placeModal = null;
+            return true;
+        }
+        if (this.cityMenuModal?.isValid) {
+            this.closeCityMenu();
+            return true;
+        }
+        if (this.maleDialogueModal?.isValid) {
+            this.closeMaleDialogue();
+            return true;
+        }
+        if (this.jobModal?.isValid) {
+            this.closeJobModal();
+            return true;
+        }
+        if (this.wardrobeModal?.isValid) {
+            this.closeWardrobe();
+            return true;
+        }
+        if (this.partnerModal?.isValid) {
+            this.closePartnerPanel();
+            return true;
+        }
+        if (this.taskModal?.isValid) {
+            this.closeTaskPanel();
+            return true;
+        }
+        if (this.beautyModal?.isValid) {
+            this.closeBeautyStudio();
+            return true;
+        }
+        this.showExitConfirmation();
+        return true;
+    }
+
+    private showExitConfirmation(): void {
+        if (this.exitModal?.isValid) {
+            return;
+        }
+        this.jobPromptButton.active = false;
+        this.venuePromptButton.active = false;
+        const modal = this.createNode('ExitConfirmation', this.modalLayer);
+        modal.on(Node.EventType.TOUCH_START, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        modal.on(Node.EventType.TOUCH_END, (event: EventTouch) => {
+            event.propagationStopped = true;
+        });
+        const shade = modal.addComponent(Graphics);
+        shade.fillColor = new Color(42, 27, 53, 172);
+        shade.rect(-DESIGN_WIDTH / 2, -DESIGN_HEIGHT / 2, DESIGN_WIDTH, DESIGN_HEIGHT);
+        shade.fill();
+
+        const panel = this.createNode('ExitConfirmationPanel', modal);
+        panel.setPosition(0, 18);
+        panel.getComponent(UITransform)?.setContentSize(570, 390);
+        const graphics = panel.addComponent(Graphics);
+        graphics.fillColor = new Color(255, 248, 252, 252);
+        graphics.strokeColor = new Color(208, 163, 219, 255);
+        graphics.lineWidth = 5;
+        graphics.roundRect(-285, -195, 570, 390, 38);
+        graphics.fill();
+        graphics.stroke();
+        graphics.fillColor = new Color(206, 153, 217, 255);
+        graphics.roundRect(-112, 125, 224, 58, 29);
+        graphics.fill();
+        this.addLabel(panel, 'ExitTitle', '离开樱花街？', 29, Color.WHITE, new Vec3(0, 154), 360, 50, true);
+        this.addLabel(
+            panel,
+            'ExitMessage',
+            '当前进度会在每次获得金币、礼物、服装和好感时保存。\n\n'
+                + '返回键会关闭当前弹窗；在街区首页再次返回将退出游戏。',
+            19,
+            new Color(100, 66, 108, 255),
+            new Vec3(0, 30),
+            470,
+            140,
+            true,
+        );
+        this.createPanelButton(
+            panel,
+            'ConfirmExit',
+            '退出游戏',
+            new Vec3(-125, -128),
+            210,
+            58,
+            new Color(226, 145, 176, 255),
+            () => backNavigation.exitGame(),
+        );
+        this.createPanelButton(
+            panel,
+            'CancelExit',
+            '继续散步',
+            new Vec3(125, -128),
+            210,
+            58,
+            new Color(197, 176, 221, 255),
+            () => {
+                if (this.exitModal === modal) {
+                    this.exitModal = null;
+                }
+                modal.destroy();
+            },
+        );
+        this.exitModal = modal;
     }
 
     protected onDestroy(): void {
@@ -375,6 +492,7 @@ export class CityExplore extends Component {
             || this.maleDialogueModal?.isValid
             || this.cityMenuModal?.isValid
             || this.placeModal?.isValid
+            || this.exitModal?.isValid
         ) {
             if (this.jobActive) {
                 this.updateJob(deltaTime);
@@ -1680,7 +1798,7 @@ export class CityExplore extends Component {
                 250,
                 64,
                 partner.accent,
-                () => director.loadScene('ChallengeArena'),
+                () => navigateTo('ChallengeArena'),
             );
         }
         this.createPanelButton(
@@ -1961,7 +2079,7 @@ export class CityExplore extends Component {
                 name: 'OpenCityChallenge',
                 label: '女性挑战',
                 color: new Color(236, 151, 190, 255),
-                action: () => director.loadScene('ChallengeArena'),
+                action: () => navigateTo('ChallengeArena'),
             },
             {
                 name: 'OpenCityWardrobe',
@@ -1985,13 +2103,13 @@ export class CityExplore extends Component {
                 name: 'OpenCityGallery',
                 label: '角色图鉴',
                 color: new Color(170, 183, 232, 255),
-                action: () => director.loadScene('CharacterGallery'),
+                action: () => navigateTo('CharacterGallery'),
             },
             {
                 name: 'OpenSakuraMarket',
                 label: '樱花市集',
                 color: new Color(229, 176, 209, 255),
-                action: () => director.loadScene('Main'),
+                action: () => navigateTo('Main'),
             },
         ];
         actions.forEach((entry, index) => {
@@ -3695,6 +3813,7 @@ export class CityExplore extends Component {
             || this.maleDialogueModal?.isValid
             || this.cityMenuModal?.isValid
             || this.placeModal?.isValid
+            || this.exitModal?.isValid
         ) {
             this.jobPromptButton.active = false;
             return;
@@ -3729,6 +3848,7 @@ export class CityExplore extends Component {
             || this.maleDialogueModal?.isValid
             || this.cityMenuModal?.isValid
             || this.placeModal?.isValid
+            || this.exitModal?.isValid
         ) {
             this.venuePromptButton.active = false;
             return;
@@ -3767,14 +3887,14 @@ export class CityExplore extends Component {
     private openCurrentVenue(): void {
         if (this.currentHome) {
             sys.localStorage.setItem(HOME_ENTER_KEY, '1');
-            director.loadScene('VenueInterior');
+            navigateTo('VenueInterior');
             return;
         }
         if (!this.currentVenue) {
             return;
         }
         setActiveVenue(this.currentVenue.id);
-        director.loadScene('VenueInterior');
+        navigateTo('VenueInterior');
     }
 
     private openCurrentJob(): void {

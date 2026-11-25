@@ -24,6 +24,7 @@ import {
     saveProgress,
 } from './GameProgress';
 import { gameFeel } from './GameFeel';
+import { backNavigation, navigateTo } from './BackNavigation';
 import { getCharacterLore } from './CharacterLoreData';
 
 const { ccclass } = _decorator;
@@ -326,6 +327,7 @@ export class CharacterGallery extends Component {
 
     protected start(): void {
         gameFeel.init();
+        backNavigation.mount(() => this.handleBack());
         this.progress = loadProgress();
         this.selectedId = CHARACTERS.find((entry) => (
             this.progress.unlockedCharacters.indexOf(entry.id) >= 0
@@ -335,6 +337,16 @@ export class CharacterGallery extends Component {
         this.createGallery();
         this.createActions();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.modal?.isValid) {
+            this.modal.destroy();
+            this.modal = null;
+            return true;
+        }
+        navigateTo(backNavigation.originOr('Main'));
+        return true;
     }
 
     private createLayers(): void {
@@ -764,12 +776,14 @@ export class CharacterGallery extends Component {
     private createActions(): void {
         this.createButton(
             'BackButton',
-            '返回市集',
+            '返回',
             new Vec3(-290, 590),
             128,
             56,
             new Color(190, 159, 240, 255),
-            () => director.loadScene('Main'),
+            () => {
+                navigateTo(backNavigation.originOr('Main'));
+            },
         );
         this.createButton(
             'SearchButton',

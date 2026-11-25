@@ -31,6 +31,7 @@ import { StoryChoice, SWEET_SHOP_CHAPTER } from './StoryData';
 import { FeelSettings, gameFeel } from './GameFeel';
 import { getOutfit } from './WardrobeData';
 import { getPartnerSupport } from './PartnerData';
+import { backNavigation, navigateTo } from './BackNavigation';
 
 const { ccclass } = _decorator;
 
@@ -124,6 +125,7 @@ export class GameApp extends Component {
 
     protected start(): void {
         gameFeel.init();
+        backNavigation.mount(() => this.handleBack());
         this.progress = loadProgress();
         this.createLayers();
         this.createBackground();
@@ -134,6 +136,27 @@ export class GameApp extends Component {
         this.showSceneHint();
         this.updateStoryUi();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.settingsModal?.isValid) {
+            this.settingsModal.destroy();
+            this.settingsModal = null;
+            this.resetArmed = false;
+            return true;
+        }
+        if (this.choiceModal?.isValid) {
+            this.choiceModal.destroy();
+            this.choiceModal = null;
+            return true;
+        }
+        if (this.modal?.isValid) {
+            this.modal.destroy();
+            this.modal = null;
+            return true;
+        }
+        navigateTo('CityExplore');
+        return true;
     }
 
     private createLayers(): void {
@@ -618,7 +641,7 @@ export class GameApp extends Component {
             138,
             58,
             new Color(198, 158, 242, 255),
-            () => director.loadScene('CharacterGallery'),
+            () => navigateTo('CharacterGallery'),
         );
 
         this.createButton(
@@ -640,7 +663,7 @@ export class GameApp extends Component {
             230,
             58,
             new Color(238, 154, 205, 255),
-            () => director.loadScene('CityExplore'),
+            () => navigateTo('CityExplore'),
         );
 
         this.createButton(
@@ -1046,7 +1069,7 @@ export class GameApp extends Component {
                 this.settingsModal.destroy();
                 this.settingsModal = null;
             }
-            director.loadScene('CharacterCustomization');
+            navigateTo('CharacterCustomization');
         });
 
         const closeButton = this.createUiNode('CloseSettings', panel);

@@ -32,6 +32,7 @@ import {
     PartnerSupport,
 } from './PartnerData';
 import { CHALLENGE_REWARDS } from './EconomyData';
+import { backNavigation, navigateTo } from './BackNavigation';
 
 const { ccclass } = _decorator;
 
@@ -143,11 +144,21 @@ export class ChallengeArena extends Component {
     protected start(): void {
         this.progress = loadProgress();
         gameFeel.init();
+        backNavigation.mount(() => this.handleBack());
         this.createLayers();
         this.createBackground();
         this.createHud();
         this.renderRivalSelection();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.currentRival) {
+            this.renderRivalSelection();
+            return true;
+        }
+        navigateTo('CityExplore');
+        return true;
     }
 
     protected onDestroy(): void {
@@ -296,7 +307,7 @@ export class ChallengeArena extends Component {
             126,
             52,
             new Color(206, 168, 225, 255),
-            () => director.loadScene('CityExplore'),
+            () => navigateTo('CityExplore'),
         );
 
         const coinPill = this.createNode('ChallengeCoinPill', this.hudLayer);
@@ -1211,7 +1222,7 @@ export class ChallengeArena extends Component {
             320,
             60,
             new Color(150, 121, 183, 255),
-            () => director.loadScene('CityExplore'),
+            () => navigateTo('CityExplore'),
         );
     }
 

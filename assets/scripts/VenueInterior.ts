@@ -19,6 +19,7 @@ import {
     VerticalTextAlignment,
 } from 'cc';
 import { gameFeel } from './GameFeel';
+import { backNavigation, navigateTo } from './BackNavigation';
 import {
     captureCharacter,
     discoverVenueClue,
@@ -77,9 +78,10 @@ export class VenueInterior extends Component {
     protected start(): void {
         this.progress = loadProgress();
         if (!this.progress.onboardingComplete) {
-            director.loadScene('CharacterCustomization');
+            navigateTo('CharacterCustomization');
             return;
         }
+        backNavigation.mount(() => this.handleBack());
         const enterHome = sys.localStorage.getItem(HOME_ENTER_KEY) === '1';
         sys.localStorage.removeItem(HOME_ENTER_KEY);
         if (enterHome) {
@@ -88,7 +90,7 @@ export class VenueInterior extends Component {
         }
         const venue = getActiveVenue();
         if (!venue) {
-            director.loadScene('CityExplore');
+            navigateTo('CityExplore');
             return;
         }
         this.venue = venue;
@@ -101,6 +103,27 @@ export class VenueInterior extends Component {
         this.createHud();
         this.showVenueIntro();
         gameFeel.fadeIn(this.node);
+    }
+
+    private handleBack(): boolean {
+        if (this.infoModal?.isValid) {
+            this.closeInfoModal();
+            return true;
+        }
+        if (this.dialogueModal?.isValid) {
+            this.closeDialogue();
+            return true;
+        }
+        if (this.surgeryModal?.isValid) {
+            this.closeSurgeryPanel();
+            return true;
+        }
+        if (this.homeWardrobeModal?.isValid) {
+            this.closeHomeWardrobe();
+            return true;
+        }
+        navigateTo('CityExplore');
+        return true;
     }
 
     private startHome(): void {
@@ -498,7 +521,7 @@ export class VenueInterior extends Component {
             142,
             54,
             HOME_ACCENT,
-            () => director.loadScene('CityExplore'),
+            () => navigateTo('CityExplore'),
         );
         this.addPillLabel(
             new Vec3(112, 493),
@@ -1273,7 +1296,7 @@ export class VenueInterior extends Component {
             128,
             54,
             this.venue.accent,
-            () => director.loadScene('CityExplore'),
+            () => navigateTo('CityExplore'),
         );
 
         this.explorationLabel = this.addPillLabel(
