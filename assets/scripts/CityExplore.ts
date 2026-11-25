@@ -1927,6 +1927,14 @@ export class CityExplore extends Component {
             38,
             true,
         );
+        this.createHudButton(
+            'CityReturnButton',
+            '返回',
+            new Vec3(-285, 365),
+            132,
+            58,
+            () => this.showExitConfirmation(),
+        );
         const menuButton = this.createHudButton(
             'CityMenuButton',
             '手账',
